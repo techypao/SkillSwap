@@ -9,9 +9,23 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable([
+    'name',
+    'email',
+    'password',
+    'role',
+    'profile_picture',
+    'school_organization',
+    'bio',
+    'onboarding_completed',
+])]
+#[Hidden([
+    'password',
+    'remember_token',
+])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -27,6 +41,31 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'onboarding_completed' => 'boolean',
         ];
+    }
+
+    public function teachingSkills(): BelongsToMany
+    {
+        return $this->belongsToMany(Skill::class, 'user_skills')
+            ->wherePivot('type', 'teach')
+            ->withTimestamps();
+    }
+
+    public function learningSkills(): BelongsToMany
+    {
+        return $this->belongsToMany(Skill::class, 'user_skills')
+            ->wherePivot('type', 'learn')
+            ->withTimestamps();
+    }
+
+    public function createdSkills(): HasMany
+    {
+        return $this->hasMany(Skill::class, 'created_by');
+    }
+
+    public function availabilities(): HasMany
+    {
+        return $this->hasMany(UserAvailability::class);
     }
 }
