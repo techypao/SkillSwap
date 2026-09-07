@@ -5,6 +5,9 @@ use App\Http\Controllers\Auth\RegisterController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Middleware\EnsureOnboardingCompleted;
+use App\Http\Controllers\UserDashboardController;
+use App\Http\Controllers\DiscoverController;
+use App\Http\Controllers\MatchController;
 
 
 Route::get('/', function () {
@@ -34,14 +37,20 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
 
     // User Dashboard
-    Route::get('/dashboard', function () {
-    return view('dashboard');
-})
-    ->middleware([
-        'auth',
-        EnsureOnboardingCompleted::class,
-    ])
-    ->name('dashboard');
+     Route::get('/dashboard', [UserDashboardController::class, 'index'])
+        ->middleware(EnsureOnboardingCompleted::class)
+        ->name('dashboard');
+
+    // Discover
+Route::get('/discover', [DiscoverController::class, 'index'])
+    ->middleware(EnsureOnboardingCompleted::class)
+    ->name('discover.index');
+
+    // Match Details
+Route::get('/matches/{user}', [MatchController::class, 'show'])
+    ->middleware(EnsureOnboardingCompleted::class)
+    ->name('matches.show');
+
 
 
     // Admin Dashboard
@@ -55,9 +64,6 @@ Route::middleware('auth')->group(function () {
     // Logout
     Route::post('/logout', [LoginController::class, 'destroy'])
         ->name('logout');
-
-    Route::get('/onboarding', [OnboardingController::class, 'welcome'])
-        ->name('onboarding.welcome');
 
     Route::get('/onboarding', [OnboardingController::class, 'welcome'])
         ->name('onboarding.welcome');

@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
     'school_organization',
     'bio',
     'onboarding_completed',
+    'skill_credits',
 ])]
 #[Hidden([
     'password',
@@ -42,6 +43,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'onboarding_completed' => 'boolean',
+            'skill_credits' => 'integer',
         ];
     }
 
