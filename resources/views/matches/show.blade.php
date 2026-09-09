@@ -140,6 +140,21 @@
             line-height: 1.6;
         }
 
+        .rating-summary {
+            color: #b45309;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .review-item {
+            border-bottom: 1px solid #e5e7eb;
+            padding: 14px 0;
+        }
+
+        .review-item:last-child {
+            border-bottom: none;
+        }
+
         .match-badge {
             white-space: nowrap;
 
@@ -270,6 +285,85 @@
             line-height: 1.6;
         }
 
+        .alert {
+            border-radius: 10px;
+            margin-bottom: 20px;
+            padding: 14px 16px;
+        }
+
+        .alert-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .alert-info {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        .alert-error ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .pending-requests {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 10px;
+            color: #92400e;
+            margin: 18px 0;
+            padding: 14px 16px;
+        }
+
+        .pending-requests strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .pending-requests ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .swap-form {
+            margin-top: 22px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 7px;
+        }
+
+        .form-control {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 10px 12px;
+            background: white;
+        }
+
+        textarea.form-control {
+            min-height: 100px;
+            resize: vertical;
+        }
+
         .btn {
             display: inline-block;
 
@@ -362,6 +456,10 @@
             .reason-grid {
                 grid-template-columns: 1fr;
             }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
     </style>
@@ -433,6 +531,40 @@
             ← Back to Discover
         </a>
 
+        @if (session('success'))
+
+            <div class="alert alert-success">
+                {{ session('success') }}
+            </div>
+
+        @endif
+
+        @if (session('info'))
+
+            <div class="alert alert-info">
+                {{ session('info') }}
+            </div>
+
+        @endif
+
+        @if ($errors->any())
+
+            <div class="alert alert-error">
+
+                <ul>
+
+                    @foreach ($errors->all() as $error)
+
+                        <li>{{ $error }}</li>
+
+                    @endforeach
+
+                </ul>
+
+            </div>
+
+        @endif
+
 
         <!-- USER INFORMATION -->
 
@@ -458,6 +590,15 @@
 
                 @endif
 
+                <p class="rating-summary">
+                    @if ($user->reviews_received_count > 0)
+                        ★ {{ number_format((float) $user->reviews_received_avg_rating, 1) }}
+                        · {{ $user->reviews_received_count }} {{ $user->reviews_received_count === 1 ? 'completed review' : 'completed reviews' }}
+                    @else
+                        No reviews yet
+                    @endif
+                </p>
+
             </div>
 
 
@@ -476,6 +617,29 @@
             @endif
 
         </section>
+
+        @if ($user->reviewsReceived->isNotEmpty())
+
+            <section class="card">
+                <h2>Recent Reviews</h2>
+
+                @foreach ($user->reviewsReceived as $review)
+                    <article class="review-item">
+                        <strong>{{ $review->reviewer->name }}</strong>
+                        <p class="rating-summary">
+                            {{ str_repeat('★', $review->rating) }}{{ str_repeat('☆', 5 - $review->rating) }}
+                        </p>
+
+                        @if ($review->comment)
+                            <p>{{ $review->comment }}</p>
+                        @endif
+
+                        <span class="muted">{{ $review->created_at->format('F j, Y') }}</span>
+                    </article>
+                @endforeach
+            </section>
+
+        @endif
 
 
 
@@ -590,19 +754,125 @@
                     each other's learning goals.
                 </p>
 
-                <p>
-                    You will be able to send a swap request in the
-                    next feature.
-                </p>
+                @if ($pendingSwapRequests->isNotEmpty())
 
+                    <div class="pending-requests">
 
-                <button
-                    type="button"
-                    class="btn btn-disabled"
-                    disabled
+                        <strong>Pending requests already sent</strong>
+
+                        <ul>
+
+                            @foreach ($pendingSwapRequests as $pendingSwapRequest)
+
+                                <li>
+                                    Teach {{ $pendingSwapRequest->offeredSkill->name }}
+                                    for {{ $pendingSwapRequest->requestedSkill->name }}
+                                </li>
+
+                            @endforeach
+
+                        </ul>
+
+                    </div>
+
+                @endif
+
+                <form
+                    method="POST"
+                    action="{{ route('swap-requests.store') }}"
+                    class="swap-form"
                 >
-                    Send Swap Request
-                </button>
+                    @csrf
+
+                    <input
+                        type="hidden"
+                        name="recipient_id"
+                        value="{{ $user->id }}"
+                    >
+
+                    <div class="form-grid">
+
+                        <div class="form-group">
+
+                            <label for="offered_skill_id">
+                                I will teach
+                            </label>
+
+                            <select
+                                id="offered_skill_id"
+                                name="offered_skill_id"
+                                class="form-control"
+                                required
+                            >
+
+                                @foreach ($skillsYouCanTeach as $skill)
+
+                                    <option
+                                        value="{{ $skill->id }}"
+                                        @selected((int) old('offered_skill_id') === $skill->id)
+                                    >
+                                        {{ $skill->name }}
+                                    </option>
+
+                                @endforeach
+
+                            </select>
+
+                        </div>
+
+                        <div class="form-group">
+
+                            <label for="requested_skill_id">
+                                I want to learn
+                            </label>
+
+                            <select
+                                id="requested_skill_id"
+                                name="requested_skill_id"
+                                class="form-control"
+                                required
+                            >
+
+                                @foreach ($skillsYouCanLearn as $skill)
+
+                                    <option
+                                        value="{{ $skill->id }}"
+                                        @selected((int) old('requested_skill_id') === $skill->id)
+                                    >
+                                        {{ $skill->name }}
+                                    </option>
+
+                                @endforeach
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label for="message">
+                            Message (optional)
+                        </label>
+
+                        <textarea
+                            id="message"
+                            name="message"
+                            class="form-control"
+                            maxlength="1000"
+                        >{{ old('message') }}</textarea>
+
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        Send Swap Request
+                    </button>
+
+                </form>
 
             </section>
 

@@ -16,7 +16,7 @@ class DiscoverController extends Controller
         $type = $request->input('type', 'teach');
 
         // Only allow valid filter values.
-        if (!in_array($type, ['teach', 'learn', 'all'])) {
+        if (! in_array($type, ['teach', 'learn', 'all'])) {
             $type = 'teach';
         }
 
@@ -28,6 +28,8 @@ class DiscoverController extends Controller
                 'teachingSkills',
                 'learningSkills',
             ])
+            ->withAvg('reviewsReceived', 'rating')
+            ->withCount('reviewsReceived')
 
             ->when($search !== '', function ($query) use ($search, $type) {
 
@@ -37,7 +39,7 @@ class DiscoverController extends Controller
                         $skillQuery->where(
                             'name',
                             'like',
-                            '%' . $search . '%'
+                            '%'.$search.'%'
                         );
                     });
 
@@ -47,7 +49,7 @@ class DiscoverController extends Controller
                         $skillQuery->where(
                             'name',
                             'like',
-                            '%' . $search . '%'
+                            '%'.$search.'%'
                         );
                     });
 
@@ -60,7 +62,7 @@ class DiscoverController extends Controller
                                 $skillQuery->where(
                                     'name',
                                     'like',
-                                    '%' . $search . '%'
+                                    '%'.$search.'%'
                                 );
                             })
 
@@ -68,7 +70,7 @@ class DiscoverController extends Controller
                                 $skillQuery->where(
                                     'name',
                                     'like',
-                                    '%' . $search . '%'
+                                    '%'.$search.'%'
                                 );
                             });
 

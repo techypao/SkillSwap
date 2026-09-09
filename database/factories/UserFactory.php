@@ -42,4 +42,20 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    public function onboarded(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'user',
+            'onboarding_completed' => true,
+        ]);
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'admin',
+            'onboarding_completed' => false,
+        ]);
+    }
 }

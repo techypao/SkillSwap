@@ -217,6 +217,12 @@
             font-size: 14px;
         }
 
+        .rating {
+            color: #b45309;
+            font-size: 14px;
+            margin: 7px 0 0;
+        }
+
         .bio {
             margin: 16px 0;
             color: #4b5563;
@@ -501,6 +507,15 @@
 
                                 {{ $user->school_organization }}
 
+                            </p>
+
+                            <p class="rating">
+                                @if ($user->reviews_received_count > 0)
+                                    ★ {{ number_format((float) $user->reviews_received_avg_rating, 1) }}
+                                    ({{ $user->reviews_received_count }} {{ $user->reviews_received_count === 1 ? 'review' : 'reviews' }})
+                                @else
+                                    No reviews yet
+                                @endif
                             </p>
 
                         </div>

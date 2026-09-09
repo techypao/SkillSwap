@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class MatchController extends Controller
 {
-    public function show(Request $request, User $user)
+    public function show(Request $request, User $user): View
     {
         $currentUser = $request->user();
 
@@ -30,7 +31,12 @@ class MatchController extends Controller
         $user->load([
             'teachingSkills',
             'learningSkills',
+            'reviewsReceived' => fn ($query) => $query->with('reviewer')
+                ->latest()
+                ->take(5),
         ]);
+        $user->loadAvg('reviewsReceived', 'rating');
+        $user->loadCount('reviewsReceived');
 
         /*
         |--------------------------------------------------------------------------
@@ -52,7 +58,6 @@ class MatchController extends Controller
             ->whereIn('id', $currentLearningIds)
             ->values();
 
-
         /*
         |--------------------------------------------------------------------------
         | Skills you can teach this user
@@ -73,7 +78,6 @@ class MatchController extends Controller
             ->whereIn('id', $otherUserLearningIds)
             ->values();
 
-
         /*
         |--------------------------------------------------------------------------
         | Mutual Match
@@ -83,7 +87,6 @@ class MatchController extends Controller
         $isMutualMatch =
             $skillsYouCanLearn->isNotEmpty() &&
             $skillsYouCanTeach->isNotEmpty();
-
 
         /*
         |--------------------------------------------------------------------------
@@ -116,13 +119,20 @@ class MatchController extends Controller
             );
         }
 
+        $pendingSwapRequests = $currentUser->sentSwapRequests()
+            ->where('recipient_id', $user->id)
+            ->where('status', 'pending')
+            ->with(['offeredSkill', 'requestedSkill'])
+            ->latest()
+            ->get();
 
         return view('matches.show', compact(
             'user',
             'skillsYouCanLearn',
             'skillsYouCanTeach',
             'isMutualMatch',
-            'matchScore'
+            'matchScore',
+            'pendingSwapRequests'
         ));
     }
 }

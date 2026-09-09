@@ -92,14 +92,37 @@
             display: inline-block;
             padding: 11px 16px;
             border-radius: 8px;
+            border: none;
             text-decoration: none;
             font-weight: bold;
             font-size: 14px;
+            cursor: pointer;
         }
 
         .btn-primary {
             background: #2563eb;
             color: white;
+        }
+
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+
+        .alert {
+            border-radius: 10px;
+            margin-bottom: 20px;
+            padding: 14px 16px;
+        }
+
+        .alert-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .alert-info {
+            background: #eff6ff;
+            color: #1d4ed8;
         }
 
         .grid {
@@ -173,6 +196,16 @@
 
         .request:last-child {
             border-bottom: none;
+        }
+
+        .request-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .request-actions form {
+            margin: 0;
         }
 
         @media (max-width: 700px) {
@@ -255,9 +288,19 @@
 
         @if (session('success'))
 
-            <div class="card" style="margin-bottom: 20px;">
+            <div class="alert alert-success">
 
                 {{ session('success') }}
+
+            </div>
+
+        @endif
+
+        @if (session('info'))
+
+            <div class="alert alert-info">
+
+                {{ session('info') }}
 
             </div>
 
@@ -285,6 +328,141 @@
             >
                 Discover People
             </a>
+
+        </section>
+
+
+        <section class="section">
+
+            <h2>
+                Sent Swap Requests
+            </h2>
+
+
+            <div class="card">
+
+                @forelse ($sentSwapRequests as $sentSwapRequest)
+
+                    <div class="request">
+
+                        <strong>
+                            With {{ $sentSwapRequest->recipient->name }}
+                        </strong>
+
+                        <p>
+                            You will teach:
+                            {{ $sentSwapRequest->offeredSkill->name }}
+                        </p>
+
+                        <p>
+                            You want to learn:
+                            {{ $sentSwapRequest->requestedSkill->name }}
+                        </p>
+
+                        <p>
+                            Status: {{ ucfirst($sentSwapRequest->status) }}
+                        </p>
+
+                        @if ($sentSwapRequest->message)
+
+                            <p>
+                                Message: {{ $sentSwapRequest->message }}
+                            </p>
+
+                        @endif
+
+                    </div>
+
+                @empty
+
+                    <div class="empty">
+                        No sent requests.
+                    </div>
+
+                @endforelse
+
+            </div>
+
+        </section>
+
+
+        <section class="section">
+
+            <h2>
+                Active Swaps
+            </h2>
+
+
+            <div class="card">
+
+                @forelse ($acceptedSwapRequests as $acceptedSwapRequest)
+
+                    <div class="request">
+
+                        <strong>
+                            {{ $acceptedSwapRequest->sender->name }}
+                            ↔
+                            {{ $acceptedSwapRequest->recipient->name }}
+                        </strong>
+
+                        <p>
+                            {{ $acceptedSwapRequest->sender->name }} teaches:
+                            {{ $acceptedSwapRequest->offeredSkill->name }}
+                        </p>
+
+                        <p>
+                            {{ $acceptedSwapRequest->recipient->name }} teaches:
+                            {{ $acceptedSwapRequest->requestedSkill->name }}
+                        </p>
+
+                        <p>
+                            Status: Accepted
+                        </p>
+
+                        @if (! $acceptedSwapRequest->skillSession || $acceptedSwapRequest->skillSession->status === \App\Models\SkillSession::STATUS_CANCELLED)
+
+                            <p>
+                                <strong>Discussing schedule</strong>
+                            </p>
+
+                        @elseif ($acceptedSwapRequest->skillSession->status === \App\Models\SkillSession::STATUS_PROPOSED)
+
+                            <p>
+                                <strong>
+                                    {{ $acceptedSwapRequest->skillSession->scheduled_by === $user->id ? 'Schedule proposal pending' : 'Schedule proposal needs your response' }}
+                                </strong>
+                            </p>
+
+                        @elseif ($acceptedSwapRequest->skillSession->status === \App\Models\SkillSession::STATUS_CONFIRMED)
+
+                            <p>
+                                <strong>Session confirmed</strong>
+                                —
+                                {{ $acceptedSwapRequest->skillSession->scheduled_at->format('F j, Y') }}
+                                at
+                                {{ $acceptedSwapRequest->skillSession->scheduled_at->format('g:i A') }}
+                            </p>
+
+                        @endif
+
+                        <a
+                            href="{{ route('swap-requests.chat', $acceptedSwapRequest) }}"
+                            class="btn btn-primary"
+                        >
+                            Open Chat
+                        </a>
+
+                    </div>
+
+                @empty
+
+                    <div class="empty">
+                        No active swaps yet.
+                    </div>
+
+                @endforelse
+
+            </div>
 
         </section>
 
@@ -472,7 +650,7 @@
             <section>
 
                 <h2>
-                    Swap Requests
+                    Incoming Swap Requests
                 </h2>
 
 
@@ -489,18 +667,66 @@
                             )
 
                                 <strong>
-                                    {{ $swapRequest->sender->name }}
+                                    {{ $swapRequest->sender->name }} wants to swap skills with you.
                                 </strong>
 
                                 <p>
-                                    They can teach:
+                                    {{ $swapRequest->sender->name }} will teach you:
                                     {{ $swapRequest->offeredSkill->name }}
                                 </p>
 
                                 <p>
-                                    They want to learn:
+                                    You will teach {{ $swapRequest->sender->name }}:
                                     {{ $swapRequest->requestedSkill->name }}
                                 </p>
+
+                                <p>
+                                    Status: {{ ucfirst($swapRequest->status) }}
+                                </p>
+
+                                @if ($swapRequest->message)
+
+                                    <p>
+                                        Message: {{ $swapRequest->message }}
+                                    </p>
+
+                                @endif
+
+                                <div class="request-actions">
+
+                                    <form
+                                        method="POST"
+                                        action="{{ route('swap-requests.reject', $swapRequest) }}"
+                                    >
+                                        @csrf
+                                        @method('PATCH')
+
+                                        <button
+                                            type="submit"
+                                            class="btn btn-danger"
+                                        >
+                                            Reject
+                                        </button>
+
+                                    </form>
+
+                                    <form
+                                        method="POST"
+                                        action="{{ route('swap-requests.accept', $swapRequest) }}"
+                                    >
+                                        @csrf
+                                        @method('PATCH')
+
+                                        <button
+                                            type="submit"
+                                            class="btn btn-primary"
+                                        >
+                                            Accept
+                                        </button>
+
+                                    </form>
+
+                                </div>
 
                             @else
 
@@ -536,9 +762,65 @@
 
                     @forelse ($upcomingSessions as $session)
 
-                        <p>
-                            Upcoming session
-                        </p>
+                        <div class="request">
+
+                            @if ($session->swapRequest->sender_id === $user->id)
+
+                                <strong>
+                                    With {{ $session->swapRequest->recipient->name }}
+                                </strong>
+
+                                <p>
+                                    You teach: {{ $session->swapRequest->offeredSkill->name }}
+                                </p>
+
+                                <p>
+                                    You learn: {{ $session->swapRequest->requestedSkill->name }}
+                                </p>
+
+                            @else
+
+                                <strong>
+                                    With {{ $session->swapRequest->sender->name }}
+                                </strong>
+
+                                <p>
+                                    You teach: {{ $session->swapRequest->requestedSkill->name }}
+                                </p>
+
+                                <p>
+                                    You learn: {{ $session->swapRequest->offeredSkill->name }}
+                                </p>
+
+                            @endif
+
+                            <p>
+                                {{ $session->scheduled_at->format('F j, Y') }}
+                                at
+                                {{ $session->scheduled_at->format('g:i A') }}
+                            </p>
+
+                            <p>
+                                {{ $session->duration_minutes }} minutes
+                            </p>
+
+                            <p>
+                                {{ ucwords(str_replace('_', ' ', $session->meeting_type)) }}
+                            </p>
+
+                            @if ($session->meeting_details)
+
+                                <p>
+                                    Meeting details: {{ $session->meeting_details }}
+                                </p>
+
+                            @endif
+
+                            <p>
+                                Status: {{ ucfirst($session->status) }}
+                            </p>
+
+                        </div>
 
                     @empty
 
@@ -554,6 +836,137 @@
 
 
         </div>
+
+        <section class="section">
+
+            <h2>
+                Awaiting Completion
+            </h2>
+
+            <div class="card">
+
+                @forelse ($awaitingCompletionSessions as $session)
+
+                    <div class="request">
+
+                        <strong>
+                            With {{ $session->swapRequest->sender_id === $user->id ? $session->swapRequest->recipient->name : $session->swapRequest->sender->name }}
+                        </strong>
+
+                        <p>
+                            Session started {{ $session->scheduled_at->format('F j, Y') }}
+                            at {{ $session->scheduled_at->format('g:i A') }}.
+                        </p>
+
+                        <p>
+                            @if ($session->swapRequest->sender_id === $user->id && $session->sender_confirmed_at)
+                                You confirmed completion. Waiting for the other participant.
+                            @elseif ($session->swapRequest->recipient_id === $user->id && $session->recipient_confirmed_at)
+                                You confirmed completion. Waiting for the other participant.
+                            @elseif ($session->sender_confirmed_at || $session->recipient_confirmed_at)
+                                The other participant confirmed. Your confirmation is needed.
+                            @else
+                                Both completion confirmations are still needed.
+                            @endif
+                        </p>
+
+                        <a
+                            href="{{ route('swap-requests.chat', $session->swapRequest) }}"
+                            class="btn btn-primary"
+                        >
+                            Open Chat
+                        </a>
+
+                    </div>
+
+                @empty
+
+                    <div class="empty">
+                        No sessions awaiting completion.
+                    </div>
+
+                @endforelse
+
+            </div>
+
+        </section>
+
+        <section class="section">
+
+            <h2>
+                Completed Swaps
+            </h2>
+
+            <div class="card">
+
+                @forelse ($completedSwapRequests as $completedSwapRequest)
+
+                    <div class="request">
+
+                        @if ($completedSwapRequest->sender_id === $user->id)
+
+                            <strong>With {{ $completedSwapRequest->recipient->name }}</strong>
+
+                            <p>You taught: {{ $completedSwapRequest->offeredSkill->name }}</p>
+                            <p>You learned: {{ $completedSwapRequest->requestedSkill->name }}</p>
+
+                        @else
+
+                            <strong>With {{ $completedSwapRequest->sender->name }}</strong>
+
+                            <p>You taught: {{ $completedSwapRequest->requestedSkill->name }}</p>
+                            <p>You learned: {{ $completedSwapRequest->offeredSkill->name }}</p>
+
+                        @endif
+
+                        <p>
+                            Completed: {{ $completedSwapRequest->skillSession->completed_at->format('F j, Y') }}
+                        </p>
+
+                        <p><strong>✓ Completed</strong></p>
+                        <p>+1 Skill Credit earned</p>
+
+                        @if ($completedSwapRequest->skillSession->reviews->isNotEmpty())
+
+                            <p><strong>✓ Review Submitted</strong></p>
+                            <p>
+                                Your rating:
+                                <span style="color: #d97706;">
+                                    {{ str_repeat('★', $completedSwapRequest->skillSession->reviews->first()->rating) }}{{ str_repeat('☆', 5 - $completedSwapRequest->skillSession->reviews->first()->rating) }}
+                                </span>
+                            </p>
+
+                        @else
+
+                            <a
+                                href="{{ route('reviews.create', $completedSwapRequest->skillSession) }}"
+                                class="btn btn-primary"
+                            >
+                                Leave Review
+                            </a>
+
+                        @endif
+
+                        <a
+                            href="{{ route('swap-requests.chat', $completedSwapRequest) }}"
+                            class="btn btn-primary"
+                        >
+                            View Conversation
+                        </a>
+
+                    </div>
+
+                @empty
+
+                    <div class="empty">
+                        No completed swaps yet.
+                    </div>
+
+                @endforelse
+
+            </div>
+
+        </section>
 
 
     </main>
