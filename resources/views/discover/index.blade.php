@@ -263,6 +263,12 @@
             color: #15803d;
         }
 
+        .skill small {
+            color: #6b7280;
+            display: block;
+            margin-top: 2px;
+        }
+
         .empty-state {
             text-align: center;
             padding: 40px 20px;
@@ -504,9 +510,13 @@
                             </h3>
 
                             <p class="user-school">
+                                {{ $user->program?->abbreviation ?? $user->program?->name ?? 'Program not set' }}
+                                ·
+                                {{ $user->year_level ? $user->year_level.($user->year_level === 1 ? 'st' : ($user->year_level === 2 ? 'nd' : ($user->year_level === 3 ? 'rd' : 'th'))).' Year' : 'Year level not set' }}
+                            </p>
 
-                                {{ $user->school_organization }}
-
+                            <p class="user-school">
+                                {{ $user->school_organization ?: 'School not set' }}
                             </p>
 
                             <p class="rating">
@@ -557,6 +567,7 @@
 
                                     <span class="skill">
                                         {{ $skill->name }}
+                                        <small>{{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Level not set' }}</small>
                                     </span>
 
                                 @empty
@@ -585,6 +596,7 @@
 
                                     <span class="skill skill-learning">
                                         {{ $skill->name }}
+                                        <small>{{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Level not set' }}</small>
                                     </span>
 
                                 @empty

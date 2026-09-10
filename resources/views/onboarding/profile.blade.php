@@ -130,6 +130,78 @@
             </div>
 
 
+            {{-- College Program --}}
+            <div class="mb-6">
+
+                <label
+                    for="program_id"
+                    class="block text-sm font-semibold text-gray-700 mb-2"
+                >
+                    Program
+                </label>
+
+                <select
+                    name="program_id"
+                    id="program_id"
+                    class="w-full border border-gray-300 rounded-xl px-4 py-3
+                           focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    required
+                >
+                    <option value="">Select your college program</option>
+
+                    @foreach ($programs as $program)
+                        <option
+                            value="{{ $program->id }}"
+                            @selected((string) old('program_id', $user->program_id) === (string) $program->id)
+                        >
+                            {{ $program->abbreviation ? $program->abbreviation.' — ' : '' }}{{ $program->name }}
+                        </option>
+                    @endforeach
+                </select>
+
+                @error('program_id')
+                    <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+                @enderror
+
+            </div>
+
+
+            {{-- Year Level --}}
+            <div class="mb-6">
+
+                <label
+                    for="year_level"
+                    class="block text-sm font-semibold text-gray-700 mb-2"
+                >
+                    Year Level
+                </label>
+
+                <select
+                    name="year_level"
+                    id="year_level"
+                    class="w-full border border-gray-300 rounded-xl px-4 py-3
+                           focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    required
+                >
+                    <option value="">Select your year level</option>
+
+                    @foreach ([1, 2, 3, 4, 5] as $yearLevel)
+                        <option
+                            value="{{ $yearLevel }}"
+                            @selected((string) old('year_level', $user->year_level) === (string) $yearLevel)
+                        >
+                            {{ $yearLevel }}{{ $yearLevel === 1 ? 'st' : ($yearLevel === 2 ? 'nd' : ($yearLevel === 3 ? 'rd' : 'th')) }} Year
+                        </option>
+                    @endforeach
+                </select>
+
+                @error('year_level')
+                    <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+                @enderror
+
+            </div>
+
+
             {{-- Bio --}}
             <div class="mb-8">
 

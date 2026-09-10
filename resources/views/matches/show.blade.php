@@ -578,7 +578,13 @@
 
 
                 <p class="school">
-                    {{ $user->school_organization }}
+                    {{ $user->program?->abbreviation ?? $user->program?->name ?? 'Program not set' }}
+                    ·
+                    {{ $user->year_level ? $user->year_level.($user->year_level === 1 ? 'st' : ($user->year_level === 2 ? 'nd' : ($user->year_level === 3 ? 'rd' : 'th'))).' Year' : 'Year level not set' }}
+                </p>
+
+                <p class="school">
+                    {{ $user->school_organization ?: 'School not set' }}
                 </p>
 
 
@@ -690,7 +696,9 @@
                         @foreach ($skillsYouCanLearn as $skill)
 
                             <span class="skill skill-learning">
-                                {{ $skill->name }}
+                                <strong>{{ $skill->name }}</strong><br>
+                                <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small><br>
+                                <small>{{ $user->name }}'s proficiency: {{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Not set' }}</small>
                             </span>
 
                         @endforeach
@@ -727,7 +735,9 @@
                         @foreach ($skillsYouCanTeach as $skill)
 
                             <span class="skill">
-                                {{ $skill->name }}
+                                <strong>{{ $skill->name }}</strong><br>
+                                <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small><br>
+                                <small>Your proficiency: {{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Not set' }}</small>
                             </span>
 
                         @endforeach
@@ -900,7 +910,9 @@
                             @foreach ($skillsYouCanLearn as $skill)
 
                                 <span class="skill skill-learning">
-                                    {{ $skill->name }}
+                                    <strong>{{ $skill->name }}</strong><br>
+                                    <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small><br>
+                                    <small>{{ $user->name }}'s proficiency: {{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Not set' }}</small>
                                 </span>
 
                             @endforeach
@@ -934,7 +946,9 @@
                             @foreach ($skillsYouCanTeach as $skill)
 
                                 <span class="skill">
-                                    {{ $skill->name }}
+                                    <strong>{{ $skill->name }}</strong><br>
+                                    <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small><br>
+                                    <small>Your proficiency: {{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Not set' }}</small>
                                 </span>
 
                             @endforeach

@@ -16,8 +16,9 @@ class UserDashboardController extends Controller
         $user->refresh();
 
         $user->load([
-            'teachingSkills',
-            'learningSkills',
+            'program',
+            'teachingSkills.category',
+            'learningSkills.category',
             'availabilities',
         ]);
 

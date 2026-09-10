@@ -24,13 +24,15 @@ class MatchController extends Controller
         );
 
         $currentUser->load([
-            'teachingSkills',
-            'learningSkills',
+            'program',
+            'teachingSkills.category',
+            'learningSkills.category',
         ]);
 
         $user->load([
-            'teachingSkills',
-            'learningSkills',
+            'program',
+            'teachingSkills.category',
+            'learningSkills.category',
             'reviewsReceived' => fn ($query) => $query->with('reviewer')
                 ->latest()
                 ->take(5),

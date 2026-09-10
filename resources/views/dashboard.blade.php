@@ -175,6 +175,18 @@
             color: #15803d;
         }
 
+        .skill-details {
+            display: inline-flex;
+            flex-direction: column;
+            gap: 2px;
+            border-radius: 12px;
+        }
+
+        .skill-details small {
+            color: #6b7280;
+            font-size: 11px;
+        }
+
         .section {
             margin-bottom: 25px;
         }
@@ -498,7 +510,23 @@
                 </p>
 
                 <p class="muted">
-                    {{ $user->school_organization }}
+                    {{ $user->school_organization ?: 'School not set' }}
+                </p>
+
+                <p>
+                    <strong>Program</strong>
+                </p>
+
+                <p class="muted">
+                    {{ $user->program?->abbreviation ?? $user->program?->name ?? 'Program not set' }}
+                </p>
+
+                <p>
+                    <strong>Year Level</strong>
+                </p>
+
+                <p class="muted">
+                    {{ $user->year_level ? $user->year_level.($user->year_level === 1 ? 'st' : ($user->year_level === 2 ? 'nd' : ($user->year_level === 3 ? 'rd' : 'th'))).' Year' : 'Year level not set' }}
                 </p>
 
 
@@ -529,8 +557,10 @@
 
                     @forelse ($user->teachingSkills as $skill)
 
-                        <span class="skill">
-                            {{ $skill->name }}
+                        <span class="skill skill-details">
+                            <strong>{{ $skill->name }}</strong>
+                            <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small>
+                            <small>{{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Proficiency not set' }}</small>
                         </span>
 
                     @empty
@@ -556,8 +586,10 @@
 
                     @forelse ($user->learningSkills as $skill)
 
-                        <span class="skill skill-learning">
-                            {{ $skill->name }}
+                        <span class="skill skill-learning skill-details">
+                            <strong>{{ $skill->name }}</strong>
+                            <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small>
+                            <small>{{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Proficiency not set' }}</small>
                         </span>
 
                     @empty

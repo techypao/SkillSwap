@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -19,6 +20,8 @@ use Illuminate\Notifications\Notifiable;
     'role',
     'profile_picture',
     'school_organization',
+    'program_id',
+    'year_level',
     'bio',
     'onboarding_completed',
     'skill_credits',
@@ -44,13 +47,20 @@ class User extends Authenticatable
             'password' => 'hashed',
             'onboarding_completed' => 'boolean',
             'skill_credits' => 'integer',
+            'year_level' => 'integer',
         ];
+    }
+
+    public function program(): BelongsTo
+    {
+        return $this->belongsTo(Program::class);
     }
 
     public function teachingSkills(): BelongsToMany
     {
         return $this->belongsToMany(Skill::class, 'user_skills')
             ->wherePivot('type', 'teach')
+            ->withPivot('proficiency')
             ->withTimestamps();
     }
 
@@ -58,6 +68,7 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Skill::class, 'user_skills')
             ->wherePivot('type', 'learn')
+            ->withPivot('proficiency')
             ->withTimestamps();
     }
 

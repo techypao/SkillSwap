@@ -25,8 +25,9 @@ class DiscoverController extends Controller
             ->where('role', 'user')
             ->where('onboarding_completed', true)
             ->with([
-                'teachingSkills',
-                'learningSkills',
+                'program',
+                'teachingSkills.category',
+                'learningSkills.category',
             ])
             ->withAvg('reviewsReceived', 'rating')
             ->withCount('reviewsReceived')

@@ -8,8 +8,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Skill extends Model
 {
+    public const PROFICIENCIES = [
+        'beginner',
+        'intermediate',
+        'advanced',
+    ];
+
     protected $fillable = [
         'name',
+        'skill_category_id',
         'is_approved',
         'created_by',
     ];
@@ -23,10 +30,16 @@ class Skill extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(SkillCategory::class, 'skill_category_id');
+    }
+
     public function usersWhoTeach(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_skills')
             ->wherePivot('type', 'teach')
+            ->withPivot('proficiency')
             ->withTimestamps();
     }
 
@@ -34,6 +47,7 @@ class Skill extends Model
     {
         return $this->belongsToMany(User::class, 'user_skills')
             ->wherePivot('type', 'learn')
+            ->withPivot('proficiency')
             ->withTimestamps();
     }
 }
