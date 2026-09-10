@@ -225,11 +225,37 @@ class SwapRequestControllerTest extends TestCase
             ->assertSee('Incoming Swap Requests')
             ->assertSee($sender->name)
             ->assertSee('Status: Pending');
+    }
+
+    public function test_match_page_button_posts_the_matched_skills_without_selects(): void
+    {
+        [$sender, $recipient, $offeredSkill, $requestedSkill] = $this->createCompatibleUsers();
 
         $this->actingAs($sender)
             ->get(route('matches.show', $recipient))
             ->assertOk()
-            ->assertSee('Pending requests already sent');
+            ->assertSee('Send Swap Request')
+            ->assertSee('name="offered_skill_id"', false)
+            ->assertSee('value="'.$offeredSkill->id.'"', false)
+            ->assertSee('name="requested_skill_id"', false)
+            ->assertSee('value="'.$requestedSkill->id.'"', false);
+
+        // The button alone must still create a valid swap request.
+        $this->actingAs($sender)
+            ->post(route('swap-requests.store'), [
+                'recipient_id' => $recipient->id,
+                'offered_skill_id' => $offeredSkill->id,
+                'requested_skill_id' => $requestedSkill->id,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('swap_requests', [
+            'sender_id' => $sender->id,
+            'recipient_id' => $recipient->id,
+            'offered_skill_id' => $offeredSkill->id,
+            'requested_skill_id' => $requestedSkill->id,
+            'status' => SwapRequest::STATUS_PENDING,
+        ]);
     }
 
     /**

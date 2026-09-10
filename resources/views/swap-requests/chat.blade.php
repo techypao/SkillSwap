@@ -30,6 +30,13 @@
         .alert-success { background: #dcfce7; color: #166534; }
         .alert-info { background: #eff6ff; color: #1d4ed8; }
         .alert-error { background: #fef2f2; color: #b91c1c; }
+        .countdown { border-radius: 12px; margin-bottom: 15px; padding: 16px 18px; }
+        .countdown-upcoming { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
+        .countdown-live { background: #dcfce7; border: 1px solid #86efac; color: #166534; }
+        .countdown-ended { background: #f3f4f6; border: 1px solid #e5e7eb; color: #4b5563; }
+        .countdown-label { font-size: 13px; font-weight: bold; letter-spacing: .04em; text-transform: uppercase; }
+        .countdown-time { font-size: 30px; font-weight: bold; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+        .countdown-meta { font-size: 13px; opacity: .85; }
         .session-details { background: #f9fafb; border-radius: 10px; padding: 15px; }
         .session-details p { margin: 7px 0; }
         .messages { display: flex; flex-direction: column; gap: 12px; max-height: 480px; overflow-y: auto; padding: 4px; }
@@ -105,6 +112,12 @@
                 <p class="muted">Discuss a time that works for both of you, then send a session proposal.</p>
                 <a href="{{ route('skill-sessions.create', $swapRequest) }}" class="btn btn-primary">Propose Session</a>
             @else
+                @if ($swapRequest->skillSession->status === \App\Models\SkillSession::STATUS_CONFIRMED)
+                    @include('swap-requests.partials.session-countdown', [
+                        'skillSession' => $swapRequest->skillSession,
+                    ])
+                @endif
+
                 <div class="session-details">
                     <p><strong>{{ $swapRequest->skillSession->status === \App\Models\SkillSession::STATUS_CONFIRMED ? 'SESSION CONFIRMED' : 'SESSION PROPOSAL' }}</strong></p>
                     <p>{{ $swapRequest->skillSession->scheduled_at->format('F j, Y') }} at {{ $swapRequest->skillSession->scheduled_at->format('g:i A') }}</p>

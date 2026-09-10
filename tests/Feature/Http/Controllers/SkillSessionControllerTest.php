@@ -8,6 +8,7 @@ use App\Models\SwapRequest;
 use App\Models\User;
 use App\Models\UserAvailability;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class SkillSessionControllerTest extends TestCase
@@ -212,7 +213,7 @@ class SkillSessionControllerTest extends TestCase
         $this->assertDatabaseCount('skill_sessions', 0);
     }
 
-    public function test_invalid_duration_is_rejected(): void
+    public function test_any_duration_within_the_allowed_range_is_accepted(): void
     {
         [$sender, , $swapRequest] = $this->createAcceptedSwapRequest();
         $this->travelTo('2026-09-09 08:00:00');
@@ -220,11 +221,43 @@ class SkillSessionControllerTest extends TestCase
         $this->actingAs($sender)
             ->post(route('skill-sessions.store', $swapRequest), [
                 ...$this->validSchedulePayload(),
-                'duration_minutes' => 45,
+                'duration_minutes' => 47,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('skill_sessions', [
+            'swap_request_id' => $swapRequest->id,
+            'duration_minutes' => 47,
+        ]);
+    }
+
+    #[DataProvider('outOfRangeDurations')]
+    public function test_duration_outside_the_allowed_range_is_rejected(int $duration): void
+    {
+        [$sender, , $swapRequest] = $this->createAcceptedSwapRequest();
+        $this->travelTo('2026-09-09 08:00:00');
+
+        $this->actingAs($sender)
+            ->post(route('skill-sessions.store', $swapRequest), [
+                ...$this->validSchedulePayload(),
+                'duration_minutes' => $duration,
             ])
             ->assertSessionHasErrors('duration_minutes');
 
         $this->assertDatabaseCount('skill_sessions', 0);
+    }
+
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function outOfRangeDurations(): array
+    {
+        return [
+            'zero' => [0],
+            'negative' => [-30],
+            'below minimum' => [SkillSession::MIN_DURATION_MINUTES - 1],
+            'above maximum' => [SkillSession::MAX_DURATION_MINUTES + 1],
+        ];
     }
 
     public function test_invalid_meeting_type_is_rejected(): void

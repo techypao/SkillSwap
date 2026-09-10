@@ -14,7 +14,7 @@ class AcademicProfileDisplayTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
-    public function test_dashboard_shows_academic_profile_category_and_proficiency(): void
+    public function test_dashboard_shows_academic_profile_and_skill_category(): void
     {
         [$currentUser, , $laravel, $figma] = $this->createCanonicalMatch();
 
@@ -25,12 +25,13 @@ class AcademicProfileDisplayTest extends TestCase
             ->assertSee('4th Year')
             ->assertSee($figma->name)
             ->assertSee('Design &amp; Creative', false)
-            ->assertSee('Intermediate')
             ->assertSee($laravel->name)
-            ->assertSee('Beginner');
+            ->assertSee('Technology &amp; Programming', false)
+            ->assertDontSee('Intermediate')
+            ->assertDontSee('Beginner');
     }
 
-    public function test_discover_shows_program_year_and_skill_proficiencies(): void
+    public function test_discover_shows_program_year_and_skills_without_proficiency(): void
     {
         [$currentUser, $otherUser] = $this->createCanonicalMatch();
 
@@ -41,9 +42,9 @@ class AcademicProfileDisplayTest extends TestCase
             ->assertSee('BSCS')
             ->assertSee('3rd Year')
             ->assertSee('Laravel')
-            ->assertSee('Advanced')
             ->assertSee('Figma')
-            ->assertSee('Beginner');
+            ->assertDontSee('Advanced')
+            ->assertDontSee('Beginner');
     }
 
     public function test_compatibility_uses_exact_skill_ids_and_shows_richer_context(): void
@@ -55,9 +56,8 @@ class AcademicProfileDisplayTest extends TestCase
             ->assertOk()
             ->assertSee('Mutual Match')
             ->assertSee('Technology &amp; Programming', false)
-            ->assertSee("{$otherUser->name}'s proficiency: Advanced", false)
             ->assertSee('Design &amp; Creative', false)
-            ->assertSee('Your proficiency: Intermediate');
+            ->assertDontSee('proficiency');
 
         $sameLabelDifferentId = Skill::create(['name' => 'LARAVEL', 'is_approved' => true]);
         $otherUser->teachingSkills()->detach();
@@ -93,7 +93,7 @@ class AcademicProfileDisplayTest extends TestCase
         ]);
     }
 
-    public function test_historical_swap_with_null_profiles_and_proficiencies_remains_readable(): void
+    public function test_historical_swap_with_null_academic_profile_remains_readable(): void
     {
         $sender = User::factory()->onboarded()->create([
             'name' => 'Historical Sender',
@@ -119,7 +119,7 @@ class AcademicProfileDisplayTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertSee('Program not set')
-            ->assertSee('Proficiency not set')
+            ->assertDontSee('Proficiency')
             ->assertSee('Historical Recipient')
             ->assertSee('Legacy Teaching');
     }

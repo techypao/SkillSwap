@@ -5,7 +5,10 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DiscoverController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SettingsSkillController;
 use App\Http\Controllers\SkillSessionCompletionController;
 use App\Http\Controllers\SkillSessionController;
 use App\Http\Controllers\SwapChatController;
@@ -101,6 +104,32 @@ Route::middleware('auth')->group(function () {
         ->middleware(EnsureOnboardingCompleted::class)
         ->name('reviews.store');
 
+    // Profile
+    Route::get('/profile', [ProfileController::class, 'show'])
+        ->middleware(EnsureOnboardingCompleted::class)
+        ->name('profile.show');
+
+    // Settings
+    Route::get('/settings', [SettingsController::class, 'edit'])
+        ->middleware(EnsureOnboardingCompleted::class)
+        ->name('settings.edit');
+
+    Route::patch('/settings/profile', [SettingsController::class, 'update'])
+        ->middleware(EnsureOnboardingCompleted::class)
+        ->name('settings.profile.update');
+
+    Route::get('/settings/skills', [SettingsSkillController::class, 'edit'])
+        ->middleware(EnsureOnboardingCompleted::class)
+        ->name('settings.skills.edit');
+
+    Route::patch('/settings/skills/teaching', [SettingsSkillController::class, 'updateTeaching'])
+        ->middleware(EnsureOnboardingCompleted::class)
+        ->name('settings.skills.teaching.update');
+
+    Route::patch('/settings/skills/learning', [SettingsSkillController::class, 'updateLearning'])
+        ->middleware(EnsureOnboardingCompleted::class)
+        ->name('settings.skills.learning.update');
+
     // Admin Dashboard
     Route::get('/admin/dashboard', function () {
         return view('admin.dashboard');
@@ -121,11 +150,17 @@ Route::middleware('auth')->group(function () {
     Route::post('/onboarding/profile', [OnboardingController::class, 'storeProfile'])
         ->name('onboarding.profile.store');
 
-    Route::get('/onboarding/skills', [OnboardingController::class, 'skills'])
-        ->name('onboarding.skills');
+    Route::get('/onboarding/skills/teach', [OnboardingController::class, 'teachSkills'])
+        ->name('onboarding.skills.teach');
 
-    Route::post('/onboarding/skills', [OnboardingController::class, 'storeSkills'])
-        ->name('onboarding.skills.store');
+    Route::post('/onboarding/skills/teach', [OnboardingController::class, 'storeTeachSkills'])
+        ->name('onboarding.skills.teach.store');
+
+    Route::get('/onboarding/skills/learn', [OnboardingController::class, 'learnSkills'])
+        ->name('onboarding.skills.learn');
+
+    Route::post('/onboarding/skills/learn', [OnboardingController::class, 'storeLearnSkills'])
+        ->name('onboarding.skills.learn.store');
 
     Route::get('/onboarding/availability', [OnboardingController::class, 'availability'])
         ->name('onboarding.availability');

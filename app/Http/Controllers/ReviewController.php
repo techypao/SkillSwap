@@ -14,7 +14,7 @@ class ReviewController extends Controller
     {
         Gate::authorize('review', $skillSession);
 
-        $skillSession->load(['swapRequest.sender', 'swapRequest.recipient', 'swapRequest.offeredSkill', 'swapRequest.requestedSkill']);
+        $skillSession->load(['swapRequest.sender', 'swapRequest.recipient']);
 
         if ($skillSession->reviews()->where('reviewer_id', $request->user()->id)->exists()) {
             return redirect()
@@ -24,15 +24,8 @@ class ReviewController extends Controller
 
         $currentUserIsSender = $request->user()->id === $skillSession->swapRequest->sender_id;
         $reviewee = $currentUserIsSender ? $skillSession->swapRequest->recipient : $skillSession->swapRequest->sender;
-        $skillYouTaught = $currentUserIsSender ? $skillSession->swapRequest->offeredSkill : $skillSession->swapRequest->requestedSkill;
-        $skillYouLearned = $currentUserIsSender ? $skillSession->swapRequest->requestedSkill : $skillSession->swapRequest->offeredSkill;
 
-        return view('reviews.create', compact(
-            'skillSession',
-            'reviewee',
-            'skillYouTaught',
-            'skillYouLearned'
-        ));
+        return view('reviews.create', compact('skillSession', 'reviewee'));
     }
 
     public function store(Request $request, SkillSession $skillSession): RedirectResponse

@@ -20,11 +20,11 @@
         {{-- Step Indicator --}}
         <div class="mb-6">
             <p class="text-sm text-gray-500">
-                Step 2 of 4
+                Step 2 of 5
             </p>
 
             <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
-                <div class="bg-gray-900 h-2 rounded-full w-1/2"></div>
+                <div class="bg-gray-900 h-2 rounded-full" style="width: 40%;"></div>
             </div>
         </div>
 

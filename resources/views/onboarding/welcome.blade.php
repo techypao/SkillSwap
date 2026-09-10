@@ -19,7 +19,7 @@
 
             {{-- Step Indicator --}}
             <p class="text-sm text-gray-500 mb-3">
-                Step 1 of 4
+                Step 1 of 5
             </p>
 
             {{-- Title --}}

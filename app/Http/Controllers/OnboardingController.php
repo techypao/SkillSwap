@@ -2,20 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\SyncsUserSkills;
+use App\Http\Requests\StoreLearningSkillsRequest;
 use App\Http\Requests\StoreOnboardingProfileRequest;
-use App\Http\Requests\StoreOnboardingSkillsRequest;
+use App\Http\Requests\StoreTeachingSkillsRequest;
 use App\Models\Program;
-use App\Models\Skill;
-use App\Models\SkillCategory;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class OnboardingController extends Controller
 {
+    use SyncsUserSkills;
+
     public function welcome(Request $request): View|RedirectResponse
     {
         if ($redirect = $this->onboardingRedirect($request)) {
@@ -55,81 +56,83 @@ class OnboardingController extends Controller
 
         $request->user()->update($validated);
 
-        return redirect()->route('onboarding.skills');
+        return redirect()->route('onboarding.skills.teach');
     }
 
-    public function skills(Request $request): View|RedirectResponse
+    public function teachSkills(Request $request): View|RedirectResponse
     {
         if ($redirect = $this->onboardingRedirect($request)) {
             return $redirect;
         }
 
         $user = $request->user();
-        $skills = Skill::query()
-            ->with('category')
-            ->where(function ($query) use ($user): void {
-                $query->where('is_approved', true)
-                    ->orWhere('created_by', $user->id);
-            })
-            ->orderBy('name')
-            ->get();
-        $categories = SkillCategory::query()
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
-        $selectedTeaching = $user->teachingSkills()
-            ->get()
-            ->mapWithKeys(fn (Skill $skill): array => [
-                $skill->id => $skill->pivot->proficiency,
-            ])
-            ->all();
-        $selectedLearning = $user->learningSkills()
-            ->get()
-            ->mapWithKeys(fn (Skill $skill): array => [
-                $skill->id => $skill->pivot->proficiency,
-            ])
-            ->all();
 
-        return view('onboarding.skills', compact(
-            'skills',
-            'categories',
-            'selectedTeaching',
-            'selectedLearning'
-        ));
+        if (! $this->hasProfileDetails($user)) {
+            return redirect()->route('onboarding.profile');
+        }
+
+        return view('onboarding.skills', [
+            ...$this->skillPickerData($user, 'teaching'),
+            'step' => 3,
+            'title' => 'What are your skills?',
+            'intro' => 'Pick the skills you can teach other students.',
+            'heading' => 'What can you teach?',
+            'formAction' => route('onboarding.skills.teach.store'),
+            'backRoute' => route('onboarding.profile'),
+        ]);
     }
 
-    public function storeSkills(StoreOnboardingSkillsRequest $request): RedirectResponse
+    public function storeTeachSkills(StoreTeachingSkillsRequest $request): RedirectResponse
+    {
+        if ($redirect = $this->onboardingRedirect($request)) {
+            return $redirect;
+        }
+
+        $this->syncSkillGroup($request, 'teach');
+
+        return redirect()
+            ->route('onboarding.skills.learn')
+            ->with('success', 'Your teaching skills were saved successfully!');
+    }
+
+    public function learnSkills(Request $request): View|RedirectResponse
     {
         if ($redirect = $this->onboardingRedirect($request)) {
             return $redirect;
         }
 
         $user = $request->user();
-        $validated = $request->validated();
 
-        DB::transaction(function () use ($user, $validated): void {
-            $teachingSkills = $this->selectedSkillsWithProficiency($validated, 'teaching');
-            $learningSkills = $this->selectedSkillsWithProficiency($validated, 'learning');
+        if (! $this->hasProfileDetails($user)) {
+            return redirect()->route('onboarding.profile');
+        }
 
-            $this->addSuggestedSkills($teachingSkills, $validated, 'teaching', $user->id);
-            $this->addSuggestedSkills($learningSkills, $validated, 'learning', $user->id);
+        if (! $user->teachingSkills()->exists()) {
+            return redirect()->route('onboarding.skills.teach');
+        }
 
-            DB::table('user_skills')
-                ->where('user_id', $user->id)
-                ->where('type', 'teach')
-                ->delete();
-            DB::table('user_skills')
-                ->where('user_id', $user->id)
-                ->where('type', 'learn')
-                ->delete();
+        return view('onboarding.skills', [
+            ...$this->skillPickerData($user, 'learning'),
+            'step' => 4,
+            'title' => 'What do you want to learn?',
+            'intro' => 'Pick the skills you want to learn from other students.',
+            'heading' => 'What do you want to learn?',
+            'formAction' => route('onboarding.skills.learn.store'),
+            'backRoute' => route('onboarding.skills.teach'),
+        ]);
+    }
 
-            $this->insertUserSkills($user->id, 'teach', $teachingSkills);
-            $this->insertUserSkills($user->id, 'learn', $learningSkills);
-        });
+    public function storeLearnSkills(StoreLearningSkillsRequest $request): RedirectResponse
+    {
+        if ($redirect = $this->onboardingRedirect($request)) {
+            return $redirect;
+        }
+
+        $this->syncSkillGroup($request, 'learn');
 
         return redirect()
             ->route('onboarding.availability')
-            ->with('success', 'Your skills were saved successfully!');
+            ->with('success', 'Your learning goals were saved successfully!');
     }
 
     public function availability(Request $request): View|RedirectResponse
@@ -144,8 +147,12 @@ class OnboardingController extends Controller
             return redirect()->route('onboarding.profile');
         }
 
-        if (! $user->teachingSkills()->exists() || ! $user->learningSkills()->exists()) {
-            return redirect()->route('onboarding.skills');
+        if (! $user->teachingSkills()->exists()) {
+            return redirect()->route('onboarding.skills.teach');
+        }
+
+        if (! $user->learningSkills()->exists()) {
+            return redirect()->route('onboarding.skills.learn');
         }
 
         $selectedAvailability = $user->availabilities()
@@ -168,8 +175,12 @@ class OnboardingController extends Controller
             return redirect()->route('onboarding.profile');
         }
 
-        if (! $user->teachingSkills()->exists() || ! $user->learningSkills()->exists()) {
-            return redirect()->route('onboarding.skills');
+        if (! $user->teachingSkills()->exists()) {
+            return redirect()->route('onboarding.skills.teach');
+        }
+
+        if (! $user->learningSkills()->exists()) {
+            return redirect()->route('onboarding.skills.learn');
         }
 
         $request->validate([
@@ -217,77 +228,6 @@ class OnboardingController extends Controller
         }
 
         return null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $validated
-     * @return Collection<int, array{skill_id: int, proficiency: string}>
-     */
-    private function selectedSkillsWithProficiency(array $validated, string $group): Collection
-    {
-        $proficiencies = $validated["{$group}_proficiencies"] ?? [];
-
-        return collect($validated["{$group}_skills"] ?? [])
-            ->mapWithKeys(fn (int|string $skillId): array => [
-                (int) $skillId => [
-                    'skill_id' => (int) $skillId,
-                    'proficiency' => $proficiencies[(string) $skillId],
-                ],
-            ]);
-    }
-
-    /**
-     * @param  Collection<int, array{skill_id: int, proficiency: string}>  $skills
-     * @param  array<string, mixed>  $validated
-     */
-    private function addSuggestedSkills(
-        Collection $skills,
-        array $validated,
-        string $group,
-        int $userId
-    ): void {
-        $skillNames = collect(preg_split('/[,\n]+/', $validated["new_{$group}_skills"] ?? ''))
-            ->map(fn (string $skillName): string => trim($skillName))
-            ->filter()
-            ->unique(fn (string $skillName): string => mb_strtolower($skillName));
-
-        foreach ($skillNames as $skillName) {
-            $skill = Skill::query()
-                ->whereRaw('LOWER(name) = ?', [mb_strtolower($skillName)])
-                ->first();
-
-            if (! $skill) {
-                $skill = Skill::create([
-                    'name' => $skillName,
-                    'is_approved' => false,
-                    'created_by' => $userId,
-                ]);
-            }
-
-            $skills->put($skill->id, [
-                'skill_id' => $skill->id,
-                'proficiency' => $validated["new_{$group}_proficiency"],
-            ]);
-        }
-    }
-
-    /**
-     * @param  Collection<int, array{skill_id: int, proficiency: string}>  $skills
-     */
-    private function insertUserSkills(int $userId, string $type, Collection $skills): void
-    {
-        $timestamp = now();
-
-        DB::table('user_skills')->insert(
-            $skills->map(fn (array $skill): array => [
-                'user_id' => $userId,
-                'skill_id' => $skill['skill_id'],
-                'type' => $type,
-                'proficiency' => $skill['proficiency'],
-                'created_at' => $timestamp,
-                'updated_at' => $timestamp,
-            ])->values()->all()
-        );
     }
 
     private function hasProfileDetails(User $user): bool

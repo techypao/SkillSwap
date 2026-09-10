@@ -24,7 +24,7 @@ class OnboardingControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('onboarding.profile.store'), $this->profilePayload($program, 4))
-            ->assertRedirect(route('onboarding.skills'));
+            ->assertRedirect(route('onboarding.skills.teach'));
 
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
@@ -96,18 +96,21 @@ class OnboardingControllerTest extends TestCase
             ->assertSee('Year level not set');
     }
 
-    public function test_teach_and_learn_skills_store_their_own_proficiencies(): void
+    public function test_teach_and_learn_steps_store_their_own_skills(): void
     {
         $user = User::factory()->create();
         $laravel = $this->createApprovedSkill('Laravel');
         $figma = $this->createApprovedSkill('Figma');
 
         $this->actingAs($user)
-            ->post(route('onboarding.skills.store'), [
+            ->post(route('onboarding.skills.teach.store'), [
                 'teaching_skills' => [$laravel->id],
-                'teaching_proficiencies' => [$laravel->id => 'advanced'],
+            ])
+            ->assertRedirect(route('onboarding.skills.learn'));
+
+        $this->actingAs($user)
+            ->post(route('onboarding.skills.learn.store'), [
                 'learning_skills' => [$figma->id],
-                'learning_proficiencies' => [$figma->id => 'beginner'],
             ])
             ->assertRedirect(route('onboarding.availability'));
 
@@ -115,55 +118,25 @@ class OnboardingControllerTest extends TestCase
             'user_id' => $user->id,
             'skill_id' => $laravel->id,
             'type' => 'teach',
-            'proficiency' => 'advanced',
         ]);
         $this->assertDatabaseHas('user_skills', [
             'user_id' => $user->id,
             'skill_id' => $figma->id,
             'type' => 'learn',
-            'proficiency' => 'beginner',
         ]);
     }
 
-    #[DataProvider('validProficiencies')]
-    public function test_each_supported_proficiency_is_accepted(string $proficiency): void
+    public function test_each_step_requires_at_least_one_skill(): void
     {
         $user = User::factory()->create();
-        $teachSkill = $this->createApprovedSkill('Teach '.$proficiency);
-        $learnSkill = $this->createApprovedSkill('Learn '.$proficiency);
 
         $this->actingAs($user)
-            ->post(route('onboarding.skills.store'), [
-                'teaching_skills' => [$teachSkill->id],
-                'teaching_proficiencies' => [$teachSkill->id => $proficiency],
-                'learning_skills' => [$learnSkill->id],
-                'learning_proficiencies' => [$learnSkill->id => $proficiency],
-            ])
-            ->assertSessionHasNoErrors();
-
-        $this->assertDatabaseHas('user_skills', [
-            'skill_id' => $teachSkill->id,
-            'proficiency' => $proficiency,
-        ]);
-    }
-
-    public function test_missing_and_invalid_proficiencies_are_rejected(): void
-    {
-        $user = User::factory()->create();
-        $teachSkill = $this->createApprovedSkill('Laravel');
-        $learnSkill = $this->createApprovedSkill('Figma');
+            ->post(route('onboarding.skills.teach.store'), [])
+            ->assertSessionHasErrors('teaching_skills');
 
         $this->actingAs($user)
-            ->post(route('onboarding.skills.store'), [
-                'teaching_skills' => [$teachSkill->id],
-                'teaching_proficiencies' => [$teachSkill->id => 'expert'],
-                'learning_skills' => [$learnSkill->id],
-                'learning_proficiencies' => [],
-            ])
-            ->assertSessionHasErrors([
-                "teaching_proficiencies.{$teachSkill->id}",
-                "learning_proficiencies.{$learnSkill->id}",
-            ]);
+            ->post(route('onboarding.skills.learn.store'), [])
+            ->assertSessionHasErrors('learning_skills');
 
         $this->assertDatabaseCount('user_skills', 0);
     }
@@ -177,14 +150,10 @@ class OnboardingControllerTest extends TestCase
             'created_by' => $otherUser->id,
             'is_approved' => false,
         ]);
-        $learnSkill = $this->createApprovedSkill('Figma');
 
         $this->actingAs($user)
-            ->post(route('onboarding.skills.store'), [
+            ->post(route('onboarding.skills.teach.store'), [
                 'teaching_skills' => [$unapprovedSkill->id],
-                'teaching_proficiencies' => [$unapprovedSkill->id => 'advanced'],
-                'learning_skills' => [$learnSkill->id],
-                'learning_proficiencies' => [$learnSkill->id => 'beginner'],
             ])
             ->assertSessionHasErrors('teaching_skills.0');
 
@@ -195,14 +164,10 @@ class OnboardingControllerTest extends TestCase
     {
         $user = User::factory()->create();
         $laravel = $this->createApprovedSkill('Laravel');
-        $figma = $this->createApprovedSkill('Figma');
 
         $this->actingAs($user)
-            ->post(route('onboarding.skills.store'), [
+            ->post(route('onboarding.skills.teach.store'), [
                 'new_teaching_skills' => '  laravel  , LARAVEL',
-                'new_teaching_proficiency' => 'advanced',
-                'learning_skills' => [$figma->id],
-                'learning_proficiencies' => [$figma->id => 'beginner'],
             ])
             ->assertSessionHasNoErrors();
 
@@ -212,21 +177,16 @@ class OnboardingControllerTest extends TestCase
             'user_id' => $user->id,
             'skill_id' => $laravel->id,
             'type' => 'teach',
-            'proficiency' => 'advanced',
         ]);
     }
 
     public function test_new_custom_skill_remains_unapproved_and_owned_by_suggester(): void
     {
         $user = User::factory()->create();
-        $learnSkill = $this->createApprovedSkill('Figma');
 
         $this->actingAs($user)
-            ->post(route('onboarding.skills.store'), [
+            ->post(route('onboarding.skills.teach.store'), [
                 'new_teaching_skills' => 'Campus Podcasting',
-                'new_teaching_proficiency' => 'intermediate',
-                'learning_skills' => [$learnSkill->id],
-                'learning_proficiencies' => [$learnSkill->id => 'beginner'],
             ])
             ->assertSessionHasNoErrors();
 
@@ -238,7 +198,94 @@ class OnboardingControllerTest extends TestCase
         ]);
     }
 
-    public function test_historical_null_proficiency_remains_readable(): void
+    public function test_teach_and_learn_steps_render_as_separate_pages(): void
+    {
+        $user = $this->userWithCompletedProfile();
+        $laravel = $this->createApprovedSkill('Laravel');
+
+        $this->actingAs($user)
+            ->get(route('onboarding.skills.teach'))
+            ->assertOk()
+            ->assertSee('What are your skills?')
+            ->assertSee('Step 3 of 5')
+            ->assertSee('What can you teach?')
+            ->assertDontSee('What do you want to learn?')
+            ->assertSee('teaching_skills[]', false)
+            ->assertDontSee('learning_skills[]', false);
+
+        $user->teachingSkills()->attach($laravel, ['type' => 'teach']);
+
+        $this->actingAs($user)
+            ->get(route('onboarding.skills.learn'))
+            ->assertOk()
+            ->assertSee('What do you want to learn?')
+            ->assertSee('Step 4 of 5')
+            ->assertSee('learning_skills[]', false)
+            ->assertDontSee('teaching_skills[]', false)
+            ->assertDontSee('What can you teach?');
+    }
+
+    public function test_learn_step_is_not_reachable_before_teaching_skills_are_saved(): void
+    {
+        $user = $this->userWithCompletedProfile();
+
+        $this->actingAs($user)
+            ->get(route('onboarding.skills.learn'))
+            ->assertRedirect(route('onboarding.skills.teach'));
+    }
+
+    public function test_each_step_only_replaces_its_own_side_of_the_skills(): void
+    {
+        $user = User::factory()->create();
+        $laravel = $this->createApprovedSkill('Laravel');
+        $php = $this->createApprovedSkill('PHP');
+        $figma = $this->createApprovedSkill('Figma');
+
+        $this->actingAs($user)->post(route('onboarding.skills.teach.store'), [
+            'teaching_skills' => [$laravel->id],
+        ])->assertSessionHasNoErrors();
+
+        $this->actingAs($user)->post(route('onboarding.skills.learn.store'), [
+            'learning_skills' => [$figma->id],
+        ])->assertSessionHasNoErrors();
+
+        // Revisiting the teach step must not clear the saved learning goals.
+        $this->actingAs($user)->post(route('onboarding.skills.teach.store'), [
+            'teaching_skills' => [$php->id],
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('user_skills', [
+            'user_id' => $user->id,
+            'skill_id' => $figma->id,
+            'type' => 'learn',
+        ]);
+        $this->assertDatabaseHas('user_skills', [
+            'user_id' => $user->id,
+            'skill_id' => $php->id,
+            'type' => 'teach',
+        ]);
+        $this->assertDatabaseMissing('user_skills', [
+            'user_id' => $user->id,
+            'skill_id' => $laravel->id,
+            'type' => 'teach',
+        ]);
+    }
+
+    public function test_teach_step_rejects_learning_only_payload(): void
+    {
+        $user = User::factory()->create();
+        $figma = $this->createApprovedSkill('Figma');
+
+        $this->actingAs($user)
+            ->post(route('onboarding.skills.teach.store'), [
+                'learning_skills' => [$figma->id],
+            ])
+            ->assertSessionHasErrors('teaching_skills');
+
+        $this->assertDatabaseCount('user_skills', 0);
+    }
+
+    public function test_skills_render_on_the_dashboard_without_any_proficiency(): void
     {
         $user = User::factory()->onboarded()->create();
         $skill = $this->createApprovedSkill('Historical Skill');
@@ -248,23 +295,33 @@ class OnboardingControllerTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertSee('Historical Skill')
-            ->assertSee('Proficiency not set');
+            ->assertDontSee('Proficiency')
+            ->assertDontSee('Beginner');
+    }
 
-        $this->assertNull($user->teachingSkills()->first()->pivot->proficiency);
+    public function test_historical_proficiency_values_are_ignored_but_not_destroyed(): void
+    {
+        $user = User::factory()->onboarded()->create();
+        $legacy = $this->createApprovedSkill('Legacy Skill');
+        $user->teachingSkills()->attach($legacy, ['type' => 'teach', 'proficiency' => 'advanced']);
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Legacy Skill')
+            ->assertDontSee('Advanced');
+
+        // The column is retained, so pre-existing values survive untouched.
+        $this->assertDatabaseHas('user_skills', [
+            'user_id' => $user->id,
+            'skill_id' => $legacy->id,
+            'proficiency' => 'advanced',
+        ]);
     }
 
     public static function validYearLevels(): array
     {
         return ['first' => [1], 'second' => [2], 'third' => [3], 'fourth' => [4], 'fifth' => [5]];
-    }
-
-    public static function validProficiencies(): array
-    {
-        return [
-            'beginner' => ['beginner'],
-            'intermediate' => ['intermediate'],
-            'advanced' => ['advanced'],
-        ];
     }
 
     /** @return array<string, mixed> */
@@ -281,5 +338,15 @@ class OnboardingControllerTest extends TestCase
     private function createApprovedSkill(string $name): Skill
     {
         return Skill::create(['name' => $name, 'is_approved' => true]);
+    }
+
+    private function userWithCompletedProfile(): User
+    {
+        return User::factory()->create([
+            'school_organization' => 'State University',
+            'program_id' => Program::create(['name' => 'BS Information Technology', 'is_active' => true])->id,
+            'year_level' => 4,
+            'bio' => 'Hello there.',
+        ]);
     }
 }

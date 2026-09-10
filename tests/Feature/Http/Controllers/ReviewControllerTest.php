@@ -21,12 +21,13 @@ class ReviewControllerTest extends TestCase
 
         $this->actingAs($sender)->get(route('reviews.create', $session))
             ->assertOk()->assertSee('How was your session with')
-            ->assertSee('Justine')->assertSee('You taught')->assertSee('TypeScript')
-            ->assertSee('You learned')->assertSee('PHP');
+            ->assertSee('Justine')->assertDontSee('Jiro')
+            ->assertDontSee('You taught')->assertDontSee('You learned');
 
         $this->actingAs($recipient)->get(route('reviews.create', $session))
-            ->assertOk()->assertSee('Jiro')->assertSee('You taught')->assertSee('PHP')
-            ->assertSee('You learned')->assertSee('TypeScript');
+            ->assertOk()->assertSee('How was your session with')
+            ->assertSee('Jiro')->assertDontSee('Justine')
+            ->assertDontSee('You taught')->assertDontSee('You learned');
     }
 
     public function test_sender_review_derives_recipient_and_ignores_manipulated_reviewee(): void

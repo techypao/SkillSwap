@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -20,7 +21,16 @@ class SkillSession extends Model
 
     public const MEETING_TYPE_IN_PERSON = 'in_person';
 
-    public const ALLOWED_DURATIONS = [30, 60, 90, 120];
+    public const MIN_DURATION_MINUTES = 5;
+
+    public const MAX_DURATION_MINUTES = 480;
+
+    /**
+     * Quick-pick suggestions offered alongside the free-form duration input.
+     *
+     * @var list<int>
+     */
+    public const SUGGESTED_DURATIONS = [30, 45, 60, 90, 120, 180];
 
     protected $fillable = [
         'swap_request_id',
@@ -46,6 +56,32 @@ class SkillSession extends Model
             'recipient_confirmed_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The moment this session is scheduled to finish.
+     */
+    public function endsAt(): CarbonInterface
+    {
+        return $this->scheduled_at->copy()->addMinutes($this->duration_minutes);
+    }
+
+    public function hasStarted(): bool
+    {
+        return ! $this->scheduled_at->isFuture();
+    }
+
+    public function hasEnded(): bool
+    {
+        return $this->endsAt()->isPast();
+    }
+
+    /**
+     * Whether the scheduled window is currently running.
+     */
+    public function isInProgress(): bool
+    {
+        return $this->hasStarted() && ! $this->hasEnded();
     }
 
     public function swapRequest(): BelongsTo

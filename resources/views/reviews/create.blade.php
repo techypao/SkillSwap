@@ -18,8 +18,6 @@
         .card { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; }
         .card h1 { margin-top: 0; }
         .muted { color: #6b7280; }
-        .exchange { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 20px 0; }
-        .exchange div { background: #f9fafb; border-radius: 10px; padding: 14px; }
         .form-group { margin: 20px 0; }
         .form-label { display: block; font-weight: bold; margin-bottom: 9px; }
         .rating-options { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -28,7 +26,7 @@
         textarea { border: 1px solid #d1d5db; border-radius: 8px; min-height: 120px; padding: 11px; resize: vertical; width: 100%; }
         .btn { border: 0; border-radius: 8px; background: #2563eb; color: white; cursor: pointer; font-size: 14px; font-weight: bold; padding: 11px 17px; }
         .alert-error { background: #fef2f2; border-radius: 10px; color: #b91c1c; margin-bottom: 18px; padding: 14px 16px; }
-        @media (max-width: 600px) { .navbar { padding: 15px 18px; } .exchange { grid-template-columns: 1fr; } }
+        @media (max-width: 600px) { .navbar { padding: 15px 18px; } }
     </style>
 </head>
 
@@ -57,11 +55,6 @@
         <section class="card">
             <h1>Review Your Skill Swap</h1>
             <p>How was your session with <strong>{{ $reviewee->name }}</strong>?</p>
-
-            <div class="exchange">
-                <div><strong>You taught</strong><br>{{ $skillYouTaught->name }}</div>
-                <div><strong>You learned</strong><br>{{ $skillYouLearned->name }}</div>
-            </div>
 
             <form method="POST" action="{{ route('reviews.store', $skillSession) }}">
                 @csrf

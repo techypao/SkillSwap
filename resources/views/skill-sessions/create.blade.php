@@ -391,27 +391,31 @@
 
                 <div class="form-group">
 
-                    <label for="duration_minutes">Duration</label>
+                    <label for="duration_minutes">Duration (minutes)</label>
 
-                    <select
+                    <input
+                        type="number"
                         id="duration_minutes"
                         name="duration_minutes"
                         class="form-control"
+                        value="{{ old('duration_minutes', 60) }}"
+                        min="{{ \App\Models\SkillSession::MIN_DURATION_MINUTES }}"
+                        max="{{ \App\Models\SkillSession::MAX_DURATION_MINUTES }}"
+                        step="1"
+                        list="duration_suggestions"
                         required
                     >
 
-                        @foreach ($allowedDurations as $duration)
-
-                            <option
-                                value="{{ $duration }}"
-                                @selected((int) old('duration_minutes', 60) === $duration)
-                            >
-                                {{ $duration }} minutes
-                            </option>
-
+                    <datalist id="duration_suggestions">
+                        @foreach ($suggestedDurations as $duration)
+                            <option value="{{ $duration }}">{{ $duration }} minutes</option>
                         @endforeach
+                    </datalist>
 
-                    </select>
+                    <small class="muted">
+                        Any length from {{ \App\Models\SkillSession::MIN_DURATION_MINUTES }}
+                        to {{ \App\Models\SkillSession::MAX_DURATION_MINUTES }} minutes.
+                    </small>
 
                 </div>
 

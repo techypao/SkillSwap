@@ -60,7 +60,6 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Skill::class, 'user_skills')
             ->wherePivot('type', 'teach')
-            ->withPivot('proficiency')
             ->withTimestamps();
     }
 
@@ -68,7 +67,6 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Skill::class, 'user_skills')
             ->wherePivot('type', 'learn')
-            ->withPivot('proficiency')
             ->withTimestamps();
     }
 

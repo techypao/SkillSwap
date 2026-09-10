@@ -270,6 +270,14 @@
                 Discover
             </a>
 
+            <a href="{{ route('profile.show') }}">
+                Profile
+            </a>
+
+            <a href="{{ route('settings.edit') }}">
+                Settings
+            </a>
+
             <span>
                 {{ $user->name }}
             </span>
@@ -560,7 +568,6 @@
                         <span class="skill skill-details">
                             <strong>{{ $skill->name }}</strong>
                             <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small>
-                            <small>{{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Proficiency not set' }}</small>
                         </span>
 
                     @empty
@@ -589,7 +596,6 @@
                         <span class="skill skill-learning skill-details">
                             <strong>{{ $skill->name }}</strong>
                             <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small>
-                            <small>{{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Proficiency not set' }}</small>
                         </span>
 
                     @empty

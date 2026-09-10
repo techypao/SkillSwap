@@ -3,9 +3,11 @@
 namespace Tests\Feature\Http\Controllers;
 
 use App\Models\Skill;
+use App\Models\SkillSession;
 use App\Models\SwapMessage;
 use App\Models\SwapRequest;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -144,6 +146,83 @@ class SwapChatControllerTest extends TestCase
         $this->actingAs($sender)->get(route('dashboard'))
             ->assertSee('Discussing schedule')->assertSee('Open Chat')
             ->assertSee(route('swap-requests.chat', $swapRequest), false);
+    }
+
+    public function test_confirmed_session_shows_a_countdown_before_it_starts(): void
+    {
+        $this->travelTo('2026-09-10 08:00:00');
+        [$sender, , $swapRequest] = $this->createSwapRequest();
+        $this->createConfirmedSession($swapRequest, now()->copy()->addHours(3), 60);
+
+        $this->actingAs($sender)
+            ->get(route('swap-requests.chat', $swapRequest))
+            ->assertOk()
+            ->assertSee('data-state="upcoming"', false)
+            ->assertSee('class="countdown countdown-upcoming"', false);
+    }
+
+    public function test_countdown_switches_to_time_remaining_while_the_session_runs(): void
+    {
+        $this->travelTo('2026-09-10 08:00:00');
+        [$sender, , $swapRequest] = $this->createSwapRequest();
+        // Started 20 minutes ago, 60 minute session: 40 minutes left.
+        $this->createConfirmedSession($swapRequest, now()->copy()->subMinutes(20), 60);
+
+        $this->actingAs($sender)
+            ->get(route('swap-requests.chat', $swapRequest))
+            ->assertOk()
+            ->assertSee('data-state="live"', false)
+            ->assertSee('class="countdown countdown-live"', false);
+    }
+
+    public function test_countdown_reports_the_session_as_ended_once_the_window_passes(): void
+    {
+        $this->travelTo('2026-09-10 08:00:00');
+        [$sender, , $swapRequest] = $this->createSwapRequest();
+        // Started 3 hours ago, 60 minute session: finished 2 hours ago.
+        $this->createConfirmedSession($swapRequest, now()->copy()->subHours(3), 60);
+
+        $this->actingAs($sender)
+            ->get(route('swap-requests.chat', $swapRequest))
+            ->assertOk()
+            ->assertSee('data-state="ended"', false)
+            ->assertSee('class="countdown countdown-ended"', false);
+    }
+
+    public function test_proposed_session_does_not_show_a_countdown_yet(): void
+    {
+        $this->travelTo('2026-09-10 08:00:00');
+        [$sender, , $swapRequest] = $this->createSwapRequest();
+        SkillSession::create([
+            'swap_request_id' => $swapRequest->id,
+            'scheduled_by' => $sender->id,
+            'scheduled_at' => now()->copy()->addHours(3),
+            'duration_minutes' => 60,
+            'meeting_type' => 'online',
+            'status' => SkillSession::STATUS_PROPOSED,
+        ]);
+
+        $this->actingAs($sender)
+            ->get(route('swap-requests.chat', $swapRequest))
+            ->assertOk()
+            ->assertSee('SESSION PROPOSAL')
+            ->assertDontSee('data-session-countdown', false);
+    }
+
+    private function createConfirmedSession(
+        SwapRequest $swapRequest,
+        CarbonInterface $scheduledAt,
+        int $durationMinutes
+    ): SkillSession {
+        return SkillSession::create([
+            'swap_request_id' => $swapRequest->id,
+            'scheduled_by' => $swapRequest->sender_id,
+            'scheduled_at' => $scheduledAt,
+            'duration_minutes' => $durationMinutes,
+            'meeting_type' => 'online',
+            'status' => SkillSession::STATUS_CONFIRMED,
+            'confirmed_at' => now(),
+        ]);
     }
 
     /** @return array{User, User, SwapRequest} */

@@ -44,7 +44,7 @@ class SkillSessionController extends Controller
         $skillYouLearn = $currentUserIsSender
             ? $swapRequest->requestedSkill
             : $swapRequest->offeredSkill;
-        $allowedDurations = SkillSession::ALLOWED_DURATIONS;
+        $suggestedDurations = SkillSession::SUGGESTED_DURATIONS;
 
         return view('skill-sessions.create', compact(
             'swapRequest',
@@ -52,7 +52,7 @@ class SkillSessionController extends Controller
             'otherUser',
             'skillYouTeach',
             'skillYouLearn',
-            'allowedDurations'
+            'suggestedDurations'
         ));
     }
 
@@ -64,7 +64,12 @@ class SkillSessionController extends Controller
         $validated = $request->validate([
             'date' => ['required', 'date_format:Y-m-d'],
             'time' => ['required', 'date_format:H:i'],
-            'duration_minutes' => ['required', 'integer', Rule::in(SkillSession::ALLOWED_DURATIONS)],
+            'duration_minutes' => [
+                'required',
+                'integer',
+                'min:'.SkillSession::MIN_DURATION_MINUTES,
+                'max:'.SkillSession::MAX_DURATION_MINUTES,
+            ],
             'meeting_type' => [
                 'required',
                 Rule::in([

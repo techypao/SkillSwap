@@ -567,7 +567,6 @@
 
                                     <span class="skill">
                                         {{ $skill->name }}
-                                        <small>{{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Level not set' }}</small>
                                     </span>
 
                                 @empty
@@ -596,7 +595,6 @@
 
                                     <span class="skill skill-learning">
                                         {{ $skill->name }}
-                                        <small>{{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Level not set' }}</small>
                                     </span>
 
                                 @empty

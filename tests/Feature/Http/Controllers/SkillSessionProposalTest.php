@@ -50,6 +50,24 @@ class SkillSessionProposalTest extends TestCase
             ->assertSee('https://meet.example.test/private-room');
     }
 
+    public function test_confirmed_session_cannot_be_declined_or_re_agreed(): void
+    {
+        [$sender, $recipient, $swapRequest] = $this->createSwapRequest();
+        $this->travelTo('2026-09-09 08:00:00');
+        $session = $this->createSession($swapRequest, $sender);
+
+        $this->actingAs($recipient)->patch(route('skill-sessions.agree', $session))
+            ->assertSessionHas('success');
+
+        $this->actingAs($recipient)->patch(route('skill-sessions.decline', $session))
+            ->assertSessionHas('info');
+
+        $this->assertDatabaseHas('skill_sessions', [
+            'id' => $session->id,
+            'status' => SkillSession::STATUS_CONFIRMED,
+        ]);
+    }
+
     public function test_proposer_cannot_respond_to_their_own_proposal(): void
     {
         [$sender, , $swapRequest] = $this->createSwapRequest();

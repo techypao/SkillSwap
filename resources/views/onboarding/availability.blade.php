@@ -29,7 +29,7 @@
         <div class="mb-6">
 
             <p class="text-sm text-gray-500">
-                Step 4 of 4
+                Step 5 of 5
             </p>
 
             <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
@@ -235,7 +235,7 @@
 
 
                 <a
-                    href="{{ route('onboarding.skills') }}"
+                    href="{{ route('onboarding.skills.learn') }}"
 
                     class="w-1/3 text-center
                            border border-gray-300

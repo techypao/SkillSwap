@@ -176,28 +176,6 @@
         }
 
         /* =========================
-           SCORE
-        ========================= */
-
-        .score-card {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .score {
-            font-size: 48px;
-            font-weight: bold;
-            color: #2563eb;
-
-            margin-bottom: 5px;
-        }
-
-        .score-label {
-            color: #6b7280;
-            font-size: 14px;
-        }
-
-        /* =========================
            SKILL EXCHANGE
         ========================= */
 
@@ -652,21 +630,6 @@
         @if ($isMutualMatch)
 
 
-            <!-- MATCH SCORE -->
-
-            <section class="card score-card">
-
-                <div class="score">
-                    {{ $matchScore }}%
-                </div>
-
-                <div class="score-label">
-                    Skill Match Score
-                </div>
-
-            </section>
-
-
 
             <!-- SKILL EXCHANGE -->
 
@@ -697,8 +660,7 @@
 
                             <span class="skill skill-learning">
                                 <strong>{{ $skill->name }}</strong><br>
-                                <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small><br>
-                                <small>{{ $user->name }}'s proficiency: {{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Not set' }}</small>
+                                <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small>
                             </span>
 
                         @endforeach
@@ -736,8 +698,7 @@
 
                             <span class="skill">
                                 <strong>{{ $skill->name }}</strong><br>
-                                <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small><br>
-                                <small>Your proficiency: {{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Not set' }}</small>
+                                <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small>
                             </span>
 
                         @endforeach
@@ -753,138 +714,39 @@
 
             <!-- NEXT ACTION -->
 
-            <section class="card swap-card">
+            <form
+                method="POST"
+                action="{{ route('swap-requests.store') }}"
+                class="swap-form"
+            >
+                @csrf
 
-                <h2>
-                    Ready to Swap?
-                </h2>
-
-                <p>
-                    You and {{ $user->name }} have skills that match
-                    each other's learning goals.
-                </p>
-
-                @if ($pendingSwapRequests->isNotEmpty())
-
-                    <div class="pending-requests">
-
-                        <strong>Pending requests already sent</strong>
-
-                        <ul>
-
-                            @foreach ($pendingSwapRequests as $pendingSwapRequest)
-
-                                <li>
-                                    Teach {{ $pendingSwapRequest->offeredSkill->name }}
-                                    for {{ $pendingSwapRequest->requestedSkill->name }}
-                                </li>
-
-                            @endforeach
-
-                        </ul>
-
-                    </div>
-
-                @endif
-
-                <form
-                    method="POST"
-                    action="{{ route('swap-requests.store') }}"
-                    class="swap-form"
+                <input
+                    type="hidden"
+                    name="recipient_id"
+                    value="{{ $user->id }}"
                 >
-                    @csrf
 
-                    <input
-                        type="hidden"
-                        name="recipient_id"
-                        value="{{ $user->id }}"
-                    >
+                <input
+                    type="hidden"
+                    name="offered_skill_id"
+                    value="{{ $skillsYouCanTeach->first()?->id }}"
+                >
 
-                    <div class="form-grid">
+                <input
+                    type="hidden"
+                    name="requested_skill_id"
+                    value="{{ $skillsYouCanLearn->first()?->id }}"
+                >
 
-                        <div class="form-group">
+                <button
+                    type="submit"
+                    class="btn btn-primary"
+                >
+                    Send Swap Request
+                </button>
 
-                            <label for="offered_skill_id">
-                                I will teach
-                            </label>
-
-                            <select
-                                id="offered_skill_id"
-                                name="offered_skill_id"
-                                class="form-control"
-                                required
-                            >
-
-                                @foreach ($skillsYouCanTeach as $skill)
-
-                                    <option
-                                        value="{{ $skill->id }}"
-                                        @selected((int) old('offered_skill_id') === $skill->id)
-                                    >
-                                        {{ $skill->name }}
-                                    </option>
-
-                                @endforeach
-
-                            </select>
-
-                        </div>
-
-                        <div class="form-group">
-
-                            <label for="requested_skill_id">
-                                I want to learn
-                            </label>
-
-                            <select
-                                id="requested_skill_id"
-                                name="requested_skill_id"
-                                class="form-control"
-                                required
-                            >
-
-                                @foreach ($skillsYouCanLearn as $skill)
-
-                                    <option
-                                        value="{{ $skill->id }}"
-                                        @selected((int) old('requested_skill_id') === $skill->id)
-                                    >
-                                        {{ $skill->name }}
-                                    </option>
-
-                                @endforeach
-
-                            </select>
-
-                        </div>
-
-                    </div>
-
-                    <div class="form-group">
-
-                        <label for="message">
-                            Message (optional)
-                        </label>
-
-                        <textarea
-                            id="message"
-                            name="message"
-                            class="form-control"
-                            maxlength="1000"
-                        >{{ old('message') }}</textarea>
-
-                    </div>
-
-                    <button
-                        type="submit"
-                        class="btn btn-primary"
-                    >
-                        Send Swap Request
-                    </button>
-
-                </form>
-
-            </section>
+            </form>
 
 
 
@@ -911,8 +773,7 @@
 
                                 <span class="skill skill-learning">
                                     <strong>{{ $skill->name }}</strong><br>
-                                    <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small><br>
-                                    <small>{{ $user->name }}'s proficiency: {{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Not set' }}</small>
+                                    <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small>
                                 </span>
 
                             @endforeach
@@ -947,8 +808,7 @@
 
                                 <span class="skill">
                                     <strong>{{ $skill->name }}</strong><br>
-                                    <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small><br>
-                                    <small>Your proficiency: {{ $skill->pivot->proficiency ? ucfirst($skill->pivot->proficiency) : 'Not set' }}</small>
+                                    <small>{{ $skill->category?->name ?? 'Uncategorized' }}</small>
                                 </span>
 
                             @endforeach
