@@ -11,6 +11,7 @@ class SkillSeeder extends Seeder
         $this->call([
             SkillCategorySeeder::class,
             CanonicalSkillSeeder::class,
+            SkillAliasSeeder::class,
         ]);
     }
 }

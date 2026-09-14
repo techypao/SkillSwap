@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\SkillSession;
 use App\Models\SwapRequest;
 use App\Models\User;
 
@@ -26,5 +27,14 @@ class SwapRequestPolicy
     {
         return $swapRequest->status === SwapRequest::STATUS_ACCEPTED
             && $this->schedule($user, $swapRequest);
+    }
+
+    /**
+     * Voice/video calls open once the swap's session is confirmed and close when it completes.
+     */
+    public function call(User $user, SwapRequest $swapRequest): bool
+    {
+        return $this->chat($user, $swapRequest)
+            && $swapRequest->skillSession?->status === SkillSession::STATUS_CONFIRMED;
     }
 }

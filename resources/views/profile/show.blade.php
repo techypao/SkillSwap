@@ -290,6 +290,7 @@
                 Settings
             </a>
 
+            @include('partials.notification-bell')
 
             <form
                 method="POST"
@@ -350,7 +351,7 @@
                     </p>
 
                     <p class="muted">
-                        {{ $user->school_organization ?: 'School not set' }}
+                        {{ $user->school_display_name ?: 'School not set' }}
                     </p>
                 </div>
 
@@ -361,13 +362,6 @@
                         class="btn btn-primary"
                     >
                         Edit Profile
-                    </a>
-
-                    <a
-                        href="{{ route('settings.skills.edit') }}"
-                        class="btn btn-secondary"
-                    >
-                        Edit Skills
                     </a>
                 </div>
 

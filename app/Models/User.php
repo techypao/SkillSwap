@@ -6,6 +6,7 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -20,6 +21,7 @@ use Illuminate\Notifications\Notifiable;
     'role',
     'profile_picture',
     'school_organization',
+    'school_id',
     'program_id',
     'year_level',
     'bio',
@@ -54,6 +56,19 @@ class User extends Authenticatable
     public function program(): BelongsTo
     {
         return $this->belongsTo(Program::class);
+    }
+
+    public function school(): BelongsTo
+    {
+        return $this->belongsTo(School::class);
+    }
+
+    /**
+     * Canonical school name when one is linked, else the free-text value.
+     */
+    protected function schoolDisplayName(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->school?->name ?? $this->school_organization);
     }
 
     public function teachingSkills(): BelongsToMany

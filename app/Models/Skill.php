@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Skill extends Model
 {
@@ -22,6 +23,11 @@ class Skill extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function aliases(): HasMany
+    {
+        return $this->hasMany(SkillAlias::class);
     }
 
     public function category(): BelongsTo

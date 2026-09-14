@@ -278,7 +278,115 @@
             margin-top: 0;
         }
 
+        .match-toggle {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .btn-check-match {
+            padding: 16px 38px;
+            border-radius: 999px;
+            font-size: 18px;
+            box-shadow: 0 8px 20px rgba(37, 99, 235, .25);
+            user-select: none;
+        }
+
+        /* Matches Only is a CSS-only toggle: no reload and no JavaScript. */
+        .matches-toggle-input {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .matches-toggle-input:focus-visible ~ .match-toggle .btn-check-match {
+            outline: 3px solid #93c5fd;
+            outline-offset: 3px;
+        }
+
+        .when-matches,
+        .matches-banner,
+        .compatibility,
+        .matches-empty {
+            display: none;
+        }
+
+        .matches-toggle-input:checked ~ .match-toggle .btn-check-match,
+        .matches-toggle-input:checked ~ .match-toggle .btn-check-match:hover {
+            background: white;
+            color: #2563eb;
+            box-shadow: inset 0 0 0 2px #2563eb;
+        }
+
+        .matches-toggle-input:checked ~ * .when-everyone {
+            display: none;
+        }
+
+        .matches-toggle-input:checked ~ * .when-matches {
+            display: inline;
+        }
+
+        .matches-toggle-input:checked ~ .matches-banner {
+            display: flex;
+        }
+
+        .matches-toggle-input:checked ~ .user-list .user-card:not(.is-match) {
+            display: none;
+        }
+
+        .matches-toggle-input:checked ~ .user-list .compatibility {
+            display: grid;
+        }
+
+        .matches-toggle-input:checked ~ .user-list .matches-empty {
+            display: block;
+        }
+
+        .matches-banner {
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 14px;
+            padding: 16px 20px;
+            margin-bottom: 25px;
+        }
+
+        .matches-banner strong {
+            color: #1d4ed8;
+            font-size: 18px;
+        }
+
+        .matches-banner p {
+            margin: 4px 0 0;
+            color: #4b5563;
+            font-size: 14px;
+        }
+
+        .compatibility {
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: start;
+
+            background: #f9fafb;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-top: 18px;
+        }
+
         @media (max-width: 750px) {
+
+            .matches-banner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .compatibility {
+                grid-template-columns: 1fr;
+            }
 
             .navbar {
                 padding: 15px 18px;
@@ -343,6 +451,8 @@
                 {{ auth()->user()->name }}
             </span>
 
+            @include('partials.notification-bell')
+
 
             <form
                 method="POST"
@@ -380,12 +490,45 @@
         </div>
 
 
+        {{-- Belongs to the search form, so searching keeps the current mode. --}}
+        <input type="checkbox" id="matches-toggle" class="matches-toggle-input" name="mode" value="matches" form="discover-search" aria-label="Show only two-way matches" @checked($matchesOnly)>
+
+        <div class="match-toggle">
+
+            <label
+                for="matches-toggle"
+                class="btn btn-primary btn-check-match"
+            >
+                <span class="when-everyone">Check Match</span>
+                <span class="when-matches">Show All</span>
+            </label>
+
+        </div>
+
+
+        <div class="matches-banner">
+
+            <div>
+                <strong>
+                    ♥ Matches Only
+                </strong>
+
+                <p>
+                    {{ $matchCount }} {{ $matchCount === 1 ? 'match' : 'matches' }} found —
+                    people who teach a skill you want to learn and want to learn a skill you teach.
+                </p>
+            </div>
+
+        </div>
+
+
         <section class="card search-card">
 
             <form
                 method="GET"
                 action="{{ route('discover.index') }}"
                 class="search-form"
+                id="discover-search"
             >
 
                 <div class="form-group">
@@ -464,7 +607,7 @@
                         "{{ $search }}"
                     </strong>
 
-                    <a href="{{ route('discover.index') }}">
+                    <a href="{{ route('discover.index', $matchesOnly ? ['mode' => 'matches'] : []) }}">
                         Clear Search
                     </a>
 
@@ -478,15 +621,13 @@
         <div class="results-header">
 
             <h2>
-                People
+                <span class="when-everyone">People</span>
+                <span class="when-matches">Your Matches</span>
             </h2>
 
             <span class="muted">
-
-                {{ $users->count() }}
-
-                {{ $users->count() === 1 ? 'user' : 'users' }}
-
+                <span class="when-everyone">{{ $users->count() }} {{ $users->count() === 1 ? 'user' : 'users' }}</span>
+                <span class="when-matches">{{ $matchCount }} {{ $matchCount === 1 ? 'match' : 'matches' }}</span>
             </span>
 
         </div>
@@ -497,7 +638,7 @@
             @forelse ($users as $user)
 
 
-                <article class="user-card">
+                <article class="user-card{{ $compatibilities[$user->id]['isMutualMatch'] ? ' is-match' : '' }}">
 
 
                     <div class="user-top">
@@ -516,7 +657,7 @@
                             </p>
 
                             <p class="user-school">
-                                {{ $user->school_organization ?: 'School not set' }}
+                                {{ $user->school_display_name ?: 'School not set' }}
                             </p>
 
                             <p class="rating">
@@ -535,7 +676,7 @@
                             href="{{ route('matches.show', $user) }}"
                             class="btn btn-primary"
                         >
-                            Check Match
+                            View Profile
                         </a>
 
 
@@ -547,6 +688,37 @@
                         <p class="bio">
                             {{ $user->bio }}
                         </p>
+
+                    @endif
+
+
+                    @php
+                        $compatibility = $compatibilities[$user->id];
+                    @endphp
+
+                    @if ($compatibility['isMutualMatch'])
+
+                        <div class="compatibility">
+
+                            <div class="skill-section">
+                                <h4>You Can Learn</h4>
+                                <div class="skills">
+                                    @foreach ($compatibility['skillsYouCanLearn'] as $skill)
+                                        <span class="skill">{{ $skill->name }}</span>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div class="skill-section">
+                                <h4>You Can Teach</h4>
+                                <div class="skills">
+                                    @foreach ($compatibility['skillsYouCanTeach'] as $skill)
+                                        <span class="skill skill-learning">{{ $skill->name }}</span>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                        </div>
 
                     @endif
 
@@ -655,6 +827,31 @@
 
 
             @endforelse
+
+
+            @if ($users->isNotEmpty() && $matchCount === 0)
+
+                <div class="card empty-state matches-empty">
+
+                    <h3>
+                        No two-way matches found
+                    </h3>
+
+                    <p class="muted">
+                        {{ $search ? 'No one matching "'.$search.'" is' : 'No one is' }}
+                        both teaching a skill you want to learn and learning a skill you teach yet.
+                    </p>
+
+                    <label
+                        for="matches-toggle"
+                        class="btn btn-secondary"
+                    >
+                        Show All
+                    </label>
+
+                </div>
+
+            @endif
 
         </section>
 

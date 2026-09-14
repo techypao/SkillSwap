@@ -4,13 +4,16 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DiscoverController;
 use App\Http\Controllers\MatchController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\SchoolSearchController;
 use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\SettingsSkillController;
+use App\Http\Controllers\SkillSearchController;
 use App\Http\Controllers\SkillSessionCompletionController;
 use App\Http\Controllers\SkillSessionController;
+use App\Http\Controllers\SwapCallSignalController;
 use App\Http\Controllers\SwapChatController;
 use App\Http\Controllers\SwapMessageController;
 use App\Http\Controllers\SwapRequestController;
@@ -72,6 +75,18 @@ Route::middleware('auth')->group(function () {
         ->middleware(EnsureOnboardingCompleted::class)
         ->name('swap-requests.chat');
 
+    Route::get('/swap-requests/{swapRequest}/call/signals', [SwapCallSignalController::class, 'index'])
+        ->middleware([EnsureOnboardingCompleted::class, 'throttle:240,1,call-poll'])
+        ->name('swap-requests.call.signals.index');
+
+    Route::post('/swap-requests/{swapRequest}/call/signals', [SwapCallSignalController::class, 'store'])
+        ->middleware([EnsureOnboardingCompleted::class, 'throttle:600,1,call-signal'])
+        ->name('swap-requests.call.signals.store');
+
+    Route::get('/swap-requests/{swapRequest}/messages', [SwapMessageController::class, 'index'])
+        ->middleware([EnsureOnboardingCompleted::class, 'throttle:60,1'])
+        ->name('swap-requests.messages.index');
+
     Route::post('/swap-requests/{swapRequest}/messages', [SwapMessageController::class, 'store'])
         ->middleware(EnsureOnboardingCompleted::class)
         ->name('swap-requests.messages.store');
@@ -104,6 +119,20 @@ Route::middleware('auth')->group(function () {
         ->middleware(EnsureOnboardingCompleted::class)
         ->name('reviews.store');
 
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index'])
+        ->middleware(EnsureOnboardingCompleted::class)
+        ->name('notifications.index');
+
+    Route::patch('/notifications/read-all', [NotificationController::class, 'readAll'])
+        ->middleware(EnsureOnboardingCompleted::class)
+        ->name('notifications.read-all');
+
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'read'])
+        ->middleware(EnsureOnboardingCompleted::class)
+        ->whereUuid('notification')
+        ->name('notifications.read');
+
     // Profile
     Route::get('/profile', [ProfileController::class, 'show'])
         ->middleware(EnsureOnboardingCompleted::class)
@@ -118,18 +147,6 @@ Route::middleware('auth')->group(function () {
         ->middleware(EnsureOnboardingCompleted::class)
         ->name('settings.profile.update');
 
-    Route::get('/settings/skills', [SettingsSkillController::class, 'edit'])
-        ->middleware(EnsureOnboardingCompleted::class)
-        ->name('settings.skills.edit');
-
-    Route::patch('/settings/skills/teaching', [SettingsSkillController::class, 'updateTeaching'])
-        ->middleware(EnsureOnboardingCompleted::class)
-        ->name('settings.skills.teaching.update');
-
-    Route::patch('/settings/skills/learning', [SettingsSkillController::class, 'updateLearning'])
-        ->middleware(EnsureOnboardingCompleted::class)
-        ->name('settings.skills.learning.update');
-
     // Admin Dashboard
     Route::get('/admin/dashboard', function () {
         return view('admin.dashboard');
@@ -140,6 +157,14 @@ Route::middleware('auth')->group(function () {
     // Logout
     Route::post('/logout', [LoginController::class, 'destroy'])
         ->name('logout');
+
+    // Read-only typo-tolerant skill lookup for the skill pickers.
+    Route::get('/skills/search', SkillSearchController::class)
+        ->name('skills.search');
+
+    // Read-only local school autocomplete for the profile forms.
+    Route::get('/schools/search', SchoolSearchController::class)
+        ->name('schools.search');
 
     Route::get('/onboarding', [OnboardingController::class, 'welcome'])
         ->name('onboarding.welcome');

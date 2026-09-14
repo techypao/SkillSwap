@@ -476,6 +476,8 @@
                 {{ auth()->user()->name }}
             </span>
 
+            @include('partials.notification-bell')
+
 
             <form
                 method="POST"
@@ -562,7 +564,7 @@
                 </p>
 
                 <p class="school">
-                    {{ $user->school_organization ?: 'School not set' }}
+                    {{ $user->school_display_name ?: 'School not set' }}
                 </p>
 
 

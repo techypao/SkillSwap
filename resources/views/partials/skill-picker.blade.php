@@ -32,16 +32,27 @@
 
         <div>
             <label for="{{ $group }}_search" class="block text-sm font-semibold text-gray-700 mb-2">
-                Search this category
+                Search skills
             </label>
+            {{-- Deliberately unnamed: typing here never submits a skill, only selecting one does. --}}
             <input
                 id="{{ $group }}_search"
                 type="search"
                 data-skill-search
-                placeholder="e.g. Laravel"
+                autocomplete="off"
+                placeholder="Try larvel, JS or MS Excel"
                 class="w-full border border-gray-300 rounded-xl px-4 py-3"
             >
         </div>
+    </div>
+
+    <div
+        class="mb-5 hidden rounded-xl border border-blue-200 bg-blue-50 p-4"
+        data-skill-suggestions
+        hidden
+    >
+        <p class="text-xs font-semibold uppercase tracking-wide text-blue-800">Did you mean</p>
+        <div class="mt-2 space-y-2" data-suggestion-list></div>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" data-skill-list>
@@ -109,6 +120,9 @@
                 const categoryFilter = section.querySelector('[data-category-filter]');
                 const search = section.querySelector('[data-skill-search]');
                 const cards = section.querySelectorAll('[data-skill-card]');
+                const suggestionBox = section.querySelector('[data-skill-suggestions]');
+                const suggestionList = section.querySelector('[data-suggestion-list]');
+                const searchUrl = @json(route('skills.search'));
 
                 const filterSkills = () => {
                     const category = categoryFilter.value;
@@ -128,8 +142,86 @@
                     checkbox.addEventListener('change', filterSkills);
                 });
 
+                const selectSkill = (id) => {
+                    const checkbox = section.querySelector(
+                        `[data-skill-checkbox][value="${id}"]`
+                    );
+
+                    if (! checkbox) {
+                        return;
+                    }
+
+                    checkbox.checked = true;
+                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                    checkbox.closest('[data-skill-card]')
+                        ?.scrollIntoView({ block: 'nearest' });
+                };
+
+                const renderSuggestions = (results) => {
+                    suggestionList.replaceChildren();
+
+                    if (! results.length) {
+                        suggestionBox.hidden = true;
+
+                        return;
+                    }
+
+                    results.forEach((result) => {
+                        const row = document.createElement('div');
+                        row.className = 'flex items-center justify-between gap-3';
+
+                        const text = document.createElement('span');
+                        const name = document.createElement('span');
+                        name.className = 'font-medium text-gray-900';
+                        name.textContent = result.name;
+                        const category = document.createElement('span');
+                        category.className = 'block text-xs text-gray-600';
+                        category.textContent = result.category ?? 'Other / Suggested';
+                        text.append(name, category);
+
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className =
+                            'shrink-0 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white';
+                        button.textContent = 'Select';
+                        button.addEventListener('click', () => selectSkill(result.id));
+
+                        row.append(text, button);
+                        suggestionList.append(row);
+                    });
+
+                    suggestionBox.hidden = false;
+                };
+
+                let searchTimer = null;
+                let latestQuery = 0;
+
+                const runSmartSearch = () => {
+                    const term = search.value.trim();
+
+                    if (term.length < 2) {
+                        renderSuggestions([]);
+
+                        return;
+                    }
+
+                    const queryId = ++latestQuery;
+
+                    fetch(`${searchUrl}?q=${encodeURIComponent(term)}`, {
+                        headers: { 'Accept': 'application/json' },
+                    })
+                        .then((response) => response.ok ? response.json() : [])
+                        // Ignore a slow response that a newer keystroke superseded.
+                        .then((results) => queryId === latestQuery && renderSuggestions(results))
+                        .catch(() => renderSuggestions([]));
+                };
+
                 categoryFilter.addEventListener('change', filterSkills);
-                search.addEventListener('input', filterSkills);
+                search.addEventListener('input', () => {
+                    filterSkills();
+                    clearTimeout(searchTimer);
+                    searchTimer = setTimeout(runSmartSearch, 200);
+                });
                 filterSkills();
             });
         </script>

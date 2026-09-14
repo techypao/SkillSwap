@@ -33,10 +33,13 @@
 <body>
     <nav class="navbar">
         <a href="{{ route('dashboard') }}" class="brand">SkillSwap</a>
-        <form method="POST" action="{{ route('logout') }}">
-            @csrf
-            <button type="submit" class="logout-button">Logout</button>
-        </form>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            @include('partials.notification-bell')
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" class="logout-button">Logout</button>
+            </form>
+        </div>
     </nav>
 
     <main class="container">

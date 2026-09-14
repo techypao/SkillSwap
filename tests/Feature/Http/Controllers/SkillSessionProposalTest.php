@@ -113,6 +113,7 @@ class SkillSessionProposalTest extends TestCase
 
     public function test_second_active_proposal_and_changes_after_confirmation_are_blocked(): void
     {
+        $this->travelTo('2026-09-09 08:00:00');
         [$sender, $recipient, $swapRequest] = $this->createSwapRequest();
         $session = $this->createSession($swapRequest, $sender);
 
@@ -137,6 +138,7 @@ class SkillSessionProposalTest extends TestCase
 
     public function test_confirmed_chat_stays_active_and_hides_proposal_controls(): void
     {
+        $this->travelTo('2026-09-09 08:00:00');
         [$sender, , $swapRequest] = $this->createSwapRequest();
         $this->createSession($swapRequest, $sender, [
             'status' => SkillSession::STATUS_CONFIRMED,

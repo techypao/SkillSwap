@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\AdminMiddleware;
+use App\Http\Middleware\UserMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -13,9 +15,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-    'admin' => \App\Http\Middleware\AdminMiddleware::class,
-    'user' => \App\Http\Middleware\UserMiddleware::class,
-]);
+            'admin' => AdminMiddleware::class,
+            'user' => UserMiddleware::class,
+        ]);
+
+        // WebRTC session descriptions must keep their trailing CRLF.
+        $middleware->trimStrings(except: ['payload.sdp']);
 
     })
     ->withExceptions(function (Exceptions $exceptions): void {

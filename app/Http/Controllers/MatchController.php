@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\SkillCompatibilityService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class MatchController extends Controller
 {
-    public function show(Request $request, User $user): View
+    public function show(Request $request, User $user, SkillCompatibilityService $skillCompatibility): View
     {
         $currentUser = $request->user();
 
@@ -31,6 +32,7 @@ class MatchController extends Controller
 
         $user->load([
             'program',
+            'school',
             'teachingSkills.category',
             'learningSkills.category',
             'reviewsReceived' => fn ($query) => $query->with('reviewer')
@@ -40,86 +42,12 @@ class MatchController extends Controller
         $user->loadAvg('reviewsReceived', 'rating');
         $user->loadCount('reviewsReceived');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Skills you can learn from this user
-        |--------------------------------------------------------------------------
-        |
-        | Your learning skills
-        |        ∩
-        | Their teaching skills
-        |
-        */
-
-        $currentLearningIds = $currentUser
-            ->learningSkills
-            ->pluck('id');
-
-        $skillsYouCanLearn = $user
-            ->teachingSkills
-            ->whereIn('id', $currentLearningIds)
-            ->values();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Skills you can teach this user
-        |--------------------------------------------------------------------------
-        |
-        | Your teaching skills
-        |        ∩
-        | Their learning skills
-        |
-        */
-
-        $otherUserLearningIds = $user
-            ->learningSkills
-            ->pluck('id');
-
-        $skillsYouCanTeach = $currentUser
-            ->teachingSkills
-            ->whereIn('id', $otherUserLearningIds)
-            ->values();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Mutual Match
-        |--------------------------------------------------------------------------
-        */
-
-        $isMutualMatch =
-            $skillsYouCanLearn->isNotEmpty() &&
-            $skillsYouCanTeach->isNotEmpty();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Match Score
-        |--------------------------------------------------------------------------
-        |
-        | Score is based on how much of each user's learning needs
-        | can be satisfied by the other person.
-        |
-        */
-
-        $matchScore = 0;
-
-        if ($isMutualMatch) {
-
-            $learnCoverage =
-                $currentUser->learningSkills->count() > 0
-                    ? $skillsYouCanLearn->count()
-                        / $currentUser->learningSkills->count()
-                    : 0;
-
-            $teachCoverage =
-                $user->learningSkills->count() > 0
-                    ? $skillsYouCanTeach->count()
-                        / $user->learningSkills->count()
-                    : 0;
-
-            $matchScore = (int) round(
-                (($learnCoverage + $teachCoverage) / 2) * 100
-            );
-        }
+        [
+            'skillsYouCanLearn' => $skillsYouCanLearn,
+            'skillsYouCanTeach' => $skillsYouCanTeach,
+            'isMutualMatch' => $isMutualMatch,
+            'matchScore' => $matchScore,
+        ] = $skillCompatibility->evaluate($currentUser, $user);
 
         $pendingSwapRequests = $currentUser->sentSwapRequests()
             ->where('recipient_id', $user->id)

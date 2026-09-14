@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SkillSession;
+use App\Notifications\ReviewReceived;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -56,6 +57,9 @@ class ReviewController extends Controller
                 ->route('swap-requests.chat', $skillSession->swap_request_id)
                 ->with('info', 'You have already reviewed this skill swap.');
         }
+
+        $skillSession->swapRequest->otherParticipantFor($request->user())
+            ->notify(new ReviewReceived($request->user(), $skillSession->swap_request_id));
 
         return redirect()
             ->route('swap-requests.chat', $skillSession->swap_request_id)

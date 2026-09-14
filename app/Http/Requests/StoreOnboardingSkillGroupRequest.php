@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Services\SkillSearchService;
+use App\Support\SkillNameNormalizer;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Http\FormRequest;
@@ -64,6 +66,49 @@ abstract class StoreOnboardingSkillGroupRequest extends FormRequest
             if ($selectedSkillIds === [] && $customSkills === '') {
                 $validator->errors()->add("{$group}_skills", $this->emptySelectionMessage());
             }
+
+            $this->rejectSuggestionsThatAlreadyExist($validator, $group, $customSkills);
         }];
+    }
+
+    /**
+     * Steer a custom suggestion towards a canonical skill it duplicates.
+     *
+     * An exact canonical name is left alone: that is reused silently further
+     * down. Only an alias ("Photoshop") or a near-certain typo ("larvel") is
+     * blocked, and weak similarity never is, so genuinely new skills such as
+     * "Blender" remain suggestable.
+     */
+    private function rejectSuggestionsThatAlreadyExist(
+        Validator $validator,
+        string $group,
+        string $customSkills
+    ): void {
+        if ($customSkills === '') {
+            return;
+        }
+
+        $search = app(SkillSearchService::class);
+
+        $suggestedNames = collect(preg_split('/[,
+]+/', $customSkills))
+            ->map(fn (string $name): string => trim($name))
+            ->filter()
+            ->unique(fn (string $name): string => SkillNameNormalizer::normalize($name));
+
+        foreach ($suggestedNames as $name) {
+            $match = $search->strongMatch($name);
+
+            if ($match === null || SkillNameNormalizer::matches($name, $match->name)) {
+                continue;
+            }
+
+            $validator->errors()->add(
+                "new_{$group}_skills",
+                "We found an existing skill that may match your suggestion: {$match->name}. Please select it instead."
+            );
+
+            return;
+        }
     }
 }

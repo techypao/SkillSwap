@@ -7,6 +7,7 @@ use App\Http\Requests\StoreLearningSkillsRequest;
 use App\Http\Requests\StoreOnboardingProfileRequest;
 use App\Http\Requests\StoreTeachingSkillsRequest;
 use App\Models\Program;
+use App\Models\School;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,8 +38,9 @@ class OnboardingController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
+        $selectedSchool = School::query()->active()->find(old('school_id', $user->school_id));
 
-        return view('onboarding.profile', compact('user', 'programs'));
+        return view('onboarding.profile', compact('user', 'programs', 'selectedSchool'));
     }
 
     public function storeProfile(StoreOnboardingProfileRequest $request): RedirectResponse
@@ -47,7 +49,7 @@ class OnboardingController extends Controller
             return $redirect;
         }
 
-        $validated = $request->validated();
+        $validated = $request->validatedWithSchool();
 
         if ($request->hasFile('profile_picture')) {
             $validated['profile_picture'] = $request->file('profile_picture')

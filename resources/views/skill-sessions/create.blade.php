@@ -205,6 +205,8 @@
 
             <span>{{ auth()->user()->name }}</span>
 
+            @include('partials.notification-bell')
+
             <form
                 method="POST"
                 action="{{ route('logout') }}"

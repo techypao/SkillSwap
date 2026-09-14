@@ -292,6 +292,7 @@ class SkillSessionControllerTest extends TestCase
 
     public function test_second_session_for_the_same_swap_is_prevented(): void
     {
+        $this->travelTo('2026-09-09 08:00:00');
         [$sender, , $swapRequest] = $this->createAcceptedSwapRequest();
         $this->createSkillSession($swapRequest, $sender, [
             'meeting_details' => 'Original private meeting details',

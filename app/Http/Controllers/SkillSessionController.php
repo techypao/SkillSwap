@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\SkillSession;
 use App\Models\SwapRequest;
+use App\Notifications\SessionConfirmed;
+use App\Notifications\SessionDeclined;
+use App\Notifications\SessionProposed;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -133,12 +136,15 @@ class SkillSessionController extends Controller
                 ->with('info', 'This swap already has an active session proposal.');
         }
 
+        $swapRequest->otherParticipantFor($request->user())
+            ->notify(new SessionProposed($request->user(), $swapRequest->id));
+
         return redirect()
             ->route('swap-requests.chat', $swapRequest)
             ->with('success', 'Session proposal sent!');
     }
 
-    public function agree(SkillSession $skillSession): RedirectResponse
+    public function agree(Request $request, SkillSession $skillSession): RedirectResponse
     {
         Gate::authorize('respond', $skillSession);
 
@@ -150,6 +156,11 @@ class SkillSessionController extends Controller
                 'confirmed_at' => now(),
             ]);
 
+        if ($updated === 1) {
+            $skillSession->scheduledBy
+                ->notify(new SessionConfirmed($request->user(), $skillSession->swap_request_id));
+        }
+
         return redirect()
             ->route('swap-requests.chat', $skillSession->swap_request_id)
             ->with($updated === 1 ? 'success' : 'info', $updated === 1
@@ -157,7 +168,7 @@ class SkillSessionController extends Controller
                 : 'This session proposal is no longer awaiting a response.');
     }
 
-    public function decline(SkillSession $skillSession): RedirectResponse
+    public function decline(Request $request, SkillSession $skillSession): RedirectResponse
     {
         Gate::authorize('respond', $skillSession);
 
@@ -168,6 +179,11 @@ class SkillSessionController extends Controller
                 'status' => SkillSession::STATUS_CANCELLED,
                 'confirmed_at' => null,
             ]);
+
+        if ($updated === 1) {
+            $skillSession->scheduledBy
+                ->notify(new SessionDeclined($request->user(), $skillSession->swap_request_id));
+        }
 
         return redirect()
             ->route('swap-requests.chat', $skillSession->swap_request_id)

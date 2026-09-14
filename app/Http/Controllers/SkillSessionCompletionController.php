@@ -5,13 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\CreditTransaction;
 use App\Models\SkillSession;
 use App\Models\User;
+use App\Notifications\CompletionConfirmationRequested;
+use App\Notifications\SkillSwapCompleted;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class SkillSessionCompletionController extends Controller
 {
-    public function __invoke(SkillSession $skillSession): RedirectResponse
+    public function __invoke(Request $request, SkillSession $skillSession): RedirectResponse
     {
         Gate::authorize('confirmCompletion', $skillSession);
 
@@ -73,6 +76,14 @@ class SkillSessionCompletionController extends Controller
 
             return 'completed';
         }, 5);
+
+        if ($result === 'waiting' || $result === 'completed') {
+            $notification = $result === 'waiting'
+                ? new CompletionConfirmationRequested($request->user(), $skillSession->swap_request_id)
+                : new SkillSwapCompleted($request->user(), $skillSession->swap_request_id);
+
+            $skillSession->swapRequest->otherParticipantFor($request->user())->notify($notification);
+        }
 
         return match ($result) {
             'waiting' => redirect()

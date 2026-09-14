@@ -13,6 +13,7 @@ class ProfileController extends Controller
 
         $user->load([
             'program',
+            'school',
             'teachingSkills.category',
             'learningSkills.category',
             'availabilities',

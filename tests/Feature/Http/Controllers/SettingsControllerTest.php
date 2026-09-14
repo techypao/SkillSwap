@@ -169,6 +169,27 @@ class SettingsControllerTest extends TestCase
         Storage::disk('public')->assertMissing('profile-pictures/remove.jpg');
     }
 
+    public function test_skills_cannot_be_edited_from_settings(): void
+    {
+        $program = $this->activeProgram();
+        $user = $this->onboardedUser($program);
+
+        $this->actingAs($user)->get('/settings/skills')->assertNotFound();
+        $this->actingAs($user)->patch('/settings/skills/teaching', ['teaching_skills' => [1]])->assertNotFound();
+        $this->actingAs($user)->patch('/settings/skills/learning', ['learning_skills' => [1]])->assertNotFound();
+
+        $this->actingAs($user)
+            ->get(route('settings.edit'))
+            ->assertOk()
+            ->assertDontSee('name="teaching_skills[]"', false)
+            ->assertDontSee('name="learning_skills[]"', false);
+
+        $this->actingAs($user)
+            ->get(route('profile.show'))
+            ->assertOk()
+            ->assertDontSee('Edit Skills');
+    }
+
     private function activeProgram(): Program
     {
         return Program::create([

@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\SwapRequest;
 use App\Models\User;
+use App\Notifications\SwapRequestAccepted;
+use App\Notifications\SwapRequestReceived;
+use App\Notifications\SwapRequestRejected;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -80,27 +83,31 @@ class SwapRequestController extends Controller
                 ->with('info', 'You already have a pending swap request for this skill exchange.');
         }
 
+        $recipient->notify(new SwapRequestReceived($sender, $swapRequest->id));
+
         return redirect()
             ->route('matches.show', $recipient)
             ->with('success', 'Swap request sent successfully!');
     }
 
-    public function accept(SwapRequest $swapRequest): RedirectResponse
+    public function accept(Request $request, SwapRequest $swapRequest): RedirectResponse
     {
         Gate::authorize('respond', $swapRequest);
 
         return $this->respond(
+            $request->user(),
             $swapRequest,
             SwapRequest::STATUS_ACCEPTED,
             'Swap request accepted!'
         );
     }
 
-    public function reject(SwapRequest $swapRequest): RedirectResponse
+    public function reject(Request $request, SwapRequest $swapRequest): RedirectResponse
     {
         Gate::authorize('respond', $swapRequest);
 
         return $this->respond(
+            $request->user(),
             $swapRequest,
             SwapRequest::STATUS_REJECTED,
             'Swap request rejected.'
@@ -108,6 +115,7 @@ class SwapRequestController extends Controller
     }
 
     private function respond(
+        User $responder,
         SwapRequest $swapRequest,
         string $status,
         string $successMessage
@@ -125,6 +133,10 @@ class SwapRequestController extends Controller
                 ->route('dashboard')
                 ->with('info', 'This swap request has already been responded to.');
         }
+
+        $swapRequest->sender->notify($status === SwapRequest::STATUS_ACCEPTED
+            ? new SwapRequestAccepted($responder, $swapRequest->id)
+            : new SwapRequestRejected($responder, $swapRequest->id));
 
         return redirect()
             ->route('dashboard')

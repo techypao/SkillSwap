@@ -97,73 +97,12 @@
             </div>
 
 
-            {{-- School / Organization --}}
-            <div class="mb-6">
-
-                <label
-                    for="school_organization"
-                    class="block text-sm font-semibold text-gray-700 mb-2"
-                >
-                    School / Organization
-                </label>
-
-                <input
-                    type="text"
-                    name="school_organization"
-                    id="school_organization"
-                    value="{{ old('school_organization', $user->school_organization) }}"
-                    placeholder="e.g. FEU Institute of Technology"
-                    class="w-full border border-gray-300 rounded-xl
-                           px-4 py-3
-                           focus:outline-none
-                           focus:ring-2
-                           focus:ring-gray-900"
-                    required
-                >
-
-                @error('school_organization')
-                    <p class="text-red-500 text-sm mt-2">
-                        {{ $message }}
-                    </p>
-                @enderror
-
-            </div>
+            {{-- School / University --}}
+            @include('partials.school-picker', ['user' => $user, 'selectedSchool' => $selectedSchool])
 
 
             {{-- College Program --}}
-            <div class="mb-6">
-
-                <label
-                    for="program_id"
-                    class="block text-sm font-semibold text-gray-700 mb-2"
-                >
-                    Program
-                </label>
-
-                <select
-                    name="program_id"
-                    id="program_id"
-                    class="w-full border border-gray-300 rounded-xl px-4 py-3
-                           focus:outline-none focus:ring-2 focus:ring-gray-900"
-                    required
-                >
-                    <option value="">Select your college program</option>
-
-                    @foreach ($programs as $program)
-                        <option
-                            value="{{ $program->id }}"
-                            @selected((string) old('program_id', $user->program_id) === (string) $program->id)
-                        >
-                            {{ $program->abbreviation ? $program->abbreviation.' — ' : '' }}{{ $program->name }}
-                        </option>
-                    @endforeach
-                </select>
-
-                @error('program_id')
-                    <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
-                @enderror
-
-            </div>
+            @include('partials.program-picker', ['user' => $user, 'programs' => $programs])
 
 
             {{-- Year Level --}}

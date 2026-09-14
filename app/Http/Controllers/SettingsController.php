@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateProfileSettingsRequest;
 use App\Models\Program;
+use App\Models\School;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,14 +20,15 @@ class SettingsController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
+        $selectedSchool = School::query()->active()->find(old('school_id', $user->school_id));
 
-        return view('settings.edit', compact('user', 'programs'));
+        return view('settings.edit', compact('user', 'programs', 'selectedSchool'));
     }
 
     public function update(UpdateProfileSettingsRequest $request): RedirectResponse
     {
         $user = $request->user();
-        $validated = $request->validated();
+        $validated = $request->validatedWithSchool();
 
         $removeProfilePicture = (bool) ($validated['remove_profile_picture'] ?? false);
 

@@ -63,4 +63,17 @@ class SwapRequest extends Model
     {
         return $this->hasMany(SwapMessage::class);
     }
+
+    public function callSignals(): HasMany
+    {
+        return $this->hasMany(CallSignal::class);
+    }
+
+    /**
+     * The participant on the other side of this swap from the given user.
+     */
+    public function otherParticipantFor(User $user): User
+    {
+        return $user->id === $this->sender_id ? $this->recipient : $this->sender;
+    }
 }

@@ -282,6 +282,8 @@
                 {{ $user->name }}
             </span>
 
+            @include('partials.notification-bell')
+
 
             <form
                 method="POST"
@@ -352,7 +354,7 @@
         </section>
 
 
-        <section class="section">
+        <section class="section" id="sent-requests">
 
             <h2>
                 Sent Swap Requests
@@ -518,7 +520,7 @@
                 </p>
 
                 <p class="muted">
-                    {{ $user->school_organization ?: 'School not set' }}
+                    {{ $user->school_display_name ?: 'School not set' }}
                 </p>
 
                 <p>
@@ -685,7 +687,7 @@
         <div class="grid">
 
 
-            <section>
+            <section id="incoming-requests">
 
                 <h2>
                     Incoming Swap Requests
