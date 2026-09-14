@@ -83,7 +83,7 @@ class SwapWorkspaceNavigation
             $skillSession->status === SkillSession::STATUS_COMPLETED => ['completed', 'Completed'],
             $skillSession->status === SkillSession::STATUS_PROPOSED && $skillSession->scheduled_by === $currentUserId => ['pending', 'Proposal Pending'],
             $skillSession->status === SkillSession::STATUS_PROPOSED => ['respond', 'Needs Your Response'],
-            $skillSession->hasStarted() => ['awaiting', 'Awaiting Completion'],
+            $skillSession->hasEnded() => ['awaiting', 'Awaiting Completion'],
             default => ['confirmed', 'Session Confirmed'],
         };
 

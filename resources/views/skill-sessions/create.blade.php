@@ -356,6 +356,16 @@
             >
                 @csrf
 
+                <div class="form-group">
+                    <label for="teaching_side">Who will teach this session?</label>
+                    <select id="teaching_side" name="teaching_side" class="form-control" required>
+                        <option value="">Choose a teacher and skill</option>
+                        <option value="sender" @selected(old('teaching_side') === 'sender')>{{ $swapRequest->sender->name }} teaches {{ $swapRequest->offeredSkill->name }} to {{ $swapRequest->recipient->name }} — Learner Skill Credits: {{ $swapRequest->recipient->skill_credits }}</option>
+                        <option value="recipient" @selected(old('teaching_side') === 'recipient')>{{ $swapRequest->recipient->name }} teaches {{ $swapRequest->requestedSkill->name }} to {{ $swapRequest->sender->name }} — Learner Skill Credits: {{ $swapRequest->sender->skill_credits }}</option>
+                    </select>
+                    <small class="muted">The learner needs at least 1 Skill Credit. Proposing a session does not spend credits.</small>
+                </div>
+
                 <div class="form-grid">
 
                     <div class="form-group">

@@ -57,6 +57,7 @@ class SkillSessionControllerTest extends TestCase
         $this->assertDatabaseHas('skill_sessions', [
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $sender->id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'scheduled_at' => '2026-09-12 15:00:00',
             'duration_minutes' => 60,
             'meeting_type' => SkillSession::MEETING_TYPE_ONLINE,
@@ -83,6 +84,7 @@ class SkillSessionControllerTest extends TestCase
         $this->assertDatabaseHas('skill_sessions', [
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $recipient->id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'meeting_type' => SkillSession::MEETING_TYPE_IN_PERSON,
             'status' => SkillSession::STATUS_PROPOSED,
         ]);
@@ -189,6 +191,7 @@ class SkillSessionControllerTest extends TestCase
         $this->actingAs($sender)
             ->post(route('skill-sessions.store', $swapRequest), [
                 ...$this->validSchedulePayload(),
+                'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
                 'date' => '2026-09-08',
             ])
             ->assertSessionHasErrors([
@@ -205,6 +208,7 @@ class SkillSessionControllerTest extends TestCase
         $this->actingAs($sender)
             ->post(route('skill-sessions.store', $swapRequest), [
                 ...$this->validSchedulePayload(),
+                'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
                 'date' => 'September 12',
                 'time' => 'three o clock',
             ])
@@ -417,6 +421,7 @@ class SkillSessionControllerTest extends TestCase
         return SkillSession::create([
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $scheduledBy->id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'scheduled_at' => '2026-09-12 15:00:00',
             'duration_minutes' => 60,
             'meeting_type' => SkillSession::MEETING_TYPE_ONLINE,
@@ -428,11 +433,12 @@ class SkillSessionControllerTest extends TestCase
     }
 
     /**
-     * @return array{date: string, time: string, duration_minutes: string, meeting_type: string, meeting_details: string}
+     * @return array{teaching_side: string, date: string, time: string, duration_minutes: string, meeting_type: string, meeting_details: string}
      */
     private function validSchedulePayload(): array
     {
         return [
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'date' => '2026-09-12',
             'time' => '15:00',
             'duration_minutes' => '60',

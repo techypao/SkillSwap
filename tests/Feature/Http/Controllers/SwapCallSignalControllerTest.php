@@ -300,9 +300,9 @@ class SwapCallSignalControllerTest extends TestCase
         $this->assertNull($session->sender_confirmed_at);
         $this->assertNull($session->recipient_confirmed_at);
         $this->assertNull($session->completed_at);
-        $this->assertSame(0, $sender->fresh()->skill_credits);
-        $this->assertSame(0, $recipient->fresh()->skill_credits);
-        $this->assertDatabaseCount('credit_transactions', 0);
+        $this->assertSame(1, $sender->fresh()->skill_credits);
+        $this->assertSame(1, $recipient->fresh()->skill_credits);
+        $this->assertDatabaseCount('credit_transactions', 2);
         $this->assertDatabaseCount('swap_messages', 0);
     }
 
@@ -328,7 +328,8 @@ class SwapCallSignalControllerTest extends TestCase
             ->assertSeeInOrder(['data-workspace-panel="call"', 'data-workspace-panel="chat"', 'data-workspace-panel="session"'], false)
             ->assertSee('data-workspace-tab="call"', false)
             ->assertSee('Send Message')
-            ->assertSee('Confirm Session Completed', false);
+            ->assertDontSee('Confirm Session Completed', false)
+            ->assertSee('Completion available after the session ends.');
 
         $this->actingAs($recipient)->get(route('swap-requests.chat', $swapRequest))
             ->assertOk()
@@ -418,6 +419,7 @@ class SwapCallSignalControllerTest extends TestCase
             SkillSession::create([
                 'swap_request_id' => $swapRequest->id,
                 'scheduled_by' => $sender->id,
+                'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
                 'scheduled_at' => $sessionStatus === SkillSession::STATUS_COMPLETED ? now()->subDay() : now()->subMinutes(5),
                 'duration_minutes' => 60,
                 'meeting_type' => SkillSession::MEETING_TYPE_ONLINE,

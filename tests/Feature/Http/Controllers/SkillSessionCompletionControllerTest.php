@@ -10,13 +10,15 @@ use App\Models\SwapRequest;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Carbon;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class SkillSessionCompletionControllerTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
-    public function test_sender_first_confirmation_records_timestamp_without_completing_or_awarding_credits(): void
+    public function test_sender_first_confirmation_at_exact_end_records_timestamp_without_completing_or_awarding_credits(): void
     {
         [$sender, $recipient, , $session] = $this->createConfirmedSession();
         $this->travelTo('2026-09-09 08:00:00');
@@ -31,9 +33,9 @@ class SkillSessionCompletionControllerTest extends TestCase
             'recipient_confirmed_at' => null,
             'completed_at' => null,
         ]);
-        $this->assertSame(0, $sender->fresh()->skill_credits);
-        $this->assertSame(0, $recipient->fresh()->skill_credits);
-        $this->assertDatabaseCount('credit_transactions', 0);
+        $this->assertSame(1, $sender->fresh()->skill_credits);
+        $this->assertSame(1, $recipient->fresh()->skill_credits);
+        $this->assertSame(0, CreditTransaction::where('reason', CreditTransaction::REASON_SESSION_COMPLETED)->count());
     }
 
     public function test_recipient_confirmation_maps_to_recipient_timestamp(): void
@@ -67,8 +69,8 @@ class SkillSessionCompletionControllerTest extends TestCase
             'status' => SkillSession::STATUS_COMPLETED,
             'completed_at' => '2026-09-09 08:00:00',
         ]);
-        $this->assertSame(1, $sender->fresh()->skill_credits);
-        $this->assertSame(1, $recipient->fresh()->skill_credits);
+        $this->assertSame(2, $sender->fresh()->skill_credits);
+        $this->assertSame(2, $recipient->fresh()->skill_credits);
         $this->assertDatabaseHas('credit_transactions', [
             'user_id' => $sender->id,
             'skill_session_id' => $session->id,
@@ -81,7 +83,7 @@ class SkillSessionCompletionControllerTest extends TestCase
             'amount' => 1,
             'reason' => CreditTransaction::REASON_SESSION_COMPLETED,
         ]);
-        $this->assertDatabaseCount('credit_transactions', 2);
+        $this->assertDatabaseCount('credit_transactions', 4);
     }
 
     public function test_repeated_completion_requests_do_not_award_additional_credits(): void
@@ -97,9 +99,9 @@ class SkillSessionCompletionControllerTest extends TestCase
         $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))
             ->assertSessionHas('info', 'This skill swap is already completed.');
 
-        $this->assertSame(1, $sender->fresh()->skill_credits);
-        $this->assertSame(1, $recipient->fresh()->skill_credits);
-        $this->assertDatabaseCount('credit_transactions', 2);
+        $this->assertSame(2, $sender->fresh()->skill_credits);
+        $this->assertSame(2, $recipient->fresh()->skill_credits);
+        $this->assertDatabaseCount('credit_transactions', 4);
     }
 
     public function test_future_confirmed_session_cannot_be_confirmed_complete(): void
@@ -110,7 +112,7 @@ class SkillSessionCompletionControllerTest extends TestCase
         $this->travelTo('2026-09-09 08:00:00');
 
         $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))
-            ->assertSessionHas('info', 'Completion can be confirmed after the session starts.');
+            ->assertSessionHas('info', 'This session can only be marked complete after it has ended.');
 
         $this->assertDatabaseHas('skill_sessions', [
             'id' => $session->id,
@@ -118,8 +120,146 @@ class SkillSessionCompletionControllerTest extends TestCase
             'status' => SkillSession::STATUS_CONFIRMED,
         ]);
         $this->actingAs($sender)->get(route('swap-requests.chat', $session->swapRequest))
-            ->assertSee('Completion can be confirmed after the session starts.')
+            ->assertSee('Completion available after the session ends.')
             ->assertDontSee('Confirm Session Completed');
+    }
+
+    #[DataProvider('ongoingTimes')]
+    public function test_ongoing_session_cannot_be_confirmed_or_offer_a_completion_action(string $currentTime): void
+    {
+        [$sender, $recipient, $swapRequest, $session] = $this->createConfirmedSession();
+        $this->travelTo($currentTime);
+
+        $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))
+            ->assertRedirect(route('swap-requests.chat', $swapRequest))
+            ->assertSessionHas('info', 'This session can only be marked complete after it has ended.');
+
+        $this->assertDatabaseHas('skill_sessions', [
+            'id' => $session->id,
+            'status' => SkillSession::STATUS_CONFIRMED,
+            'sender_confirmed_at' => null,
+            'recipient_confirmed_at' => null,
+            'completed_at' => null,
+        ]);
+        $this->assertDatabaseCount('credit_transactions', 2);
+        $this->assertDatabaseCount('notifications', 0);
+        $this->assertSame(1, $sender->fresh()->skill_credits);
+        $this->assertSame(1, $recipient->fresh()->skill_credits);
+        $this->get(route('swap-requests.chat', $swapRequest))
+            ->assertSee('Completion available after the session ends.')
+            ->assertDontSee('Confirm Session Completed')
+            ->assertDontSee('AWAITING COMPLETION');
+    }
+
+    public function test_application_timezone_end_boundary_and_later_confirmation_preserve_the_existing_credit_flow(): void
+    {
+        [$sender, $recipient, , $session] = $this->createConfirmedSession([
+            'scheduled_at' => '2026-09-10 00:00:00',
+            'duration_minutes' => 30,
+        ]);
+        $this->assertSame('Asia/Manila', config('app.timezone'));
+        $this->assertSame('2026-09-10T00:30:00+08:00', $session->endsAt()->toIso8601String());
+        $this->travelTo(Carbon::parse('2026-09-09 16:29:59', 'UTC'));
+
+        $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('info', 'This session can only be marked complete after it has ended.');
+        $this->assertNull($session->fresh()->sender_confirmed_at);
+
+        $this->travelTo(Carbon::parse('2026-09-09 16:30:00', 'UTC'));
+        $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('success', 'You confirmed completion. Waiting for the other participant.');
+        $this->assertSame('2026-09-10 00:30:00', $session->fresh()->sender_confirmed_at->format('Y-m-d H:i:s'));
+        $this->assertDatabaseCount('credit_transactions', 2);
+
+        $this->travelTo(Carbon::parse('2026-09-09 16:31:00', 'UTC'));
+        $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('success', 'Skill swap completed! You each earned +1 Skill Credit.');
+        $this->assertSame(SkillSession::STATUS_COMPLETED, $session->fresh()->status);
+        $this->assertSame(2, $sender->fresh()->skill_credits);
+        $this->assertSame(2, $recipient->fresh()->skill_credits);
+        $this->assertSame(2, $session->creditTransactions()->where('reason', 'session_completed')->where('amount', 1)->count());
+        $this->assertDatabaseCount('credit_transactions', 4);
+    }
+
+    #[DataProvider('invalidStoredSchedules')]
+    public function test_invalid_stored_schedule_is_rejected_with_a_readable_chat_message(string $field, mixed $value): void
+    {
+        [$sender, , , $session] = $this->createConfirmedSession();
+        $this->travelTo('2026-09-10 08:00:00');
+        SkillSession::whereKey($session->id)->update([$field => $value]);
+
+        $this->actingAs($sender)->followingRedirects()
+            ->patch(route('skill-sessions.completion.store', $session))
+            ->assertOk()
+            ->assertSee('This session cannot be marked complete because its schedule is missing or invalid.')
+            ->assertDontSee('Confirm Session Completed');
+
+        $this->assertDatabaseHas('skill_sessions', [
+            'id' => $session->id,
+            'status' => SkillSession::STATUS_CONFIRMED,
+            'sender_confirmed_at' => null,
+            'recipient_confirmed_at' => null,
+            'completed_at' => null,
+        ]);
+        $this->assertDatabaseCount('credit_transactions', 2);
+        $this->assertDatabaseCount('notifications', 0);
+    }
+
+    #[DataProvider('ineligibleSwapStatuses')]
+    public function test_non_accepted_swaps_cannot_confirm_even_after_the_session_ends(string $status): void
+    {
+        [$sender, , $swapRequest, $session] = $this->createConfirmedSession();
+        $swapRequest->update(['status' => $status]);
+        $this->travelTo('2026-09-09 08:01:00');
+
+        $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))->assertForbidden();
+
+        $this->assertNull($session->fresh()->sender_confirmed_at);
+        $this->assertDatabaseCount('credit_transactions', 2);
+        $this->assertDatabaseCount('notifications', 0);
+    }
+
+    public function test_dashboard_excludes_ongoing_sessions_without_hiding_older_ended_sessions(): void
+    {
+        $this->travelTo('2026-09-09 08:00:00');
+        [$sender, $recipient, , $endedSession] = $this->createConfirmedSession();
+        for ($index = 0; $index < 6; $index++) {
+            $this->createConfirmedSession(['scheduled_at' => '2026-09-09 07:30:00'], $sender, $recipient);
+        }
+
+        $response = $this->actingAs($sender)->get(route('dashboard'))->assertOk();
+
+        $this->assertSame([$endedSession->id], $response->viewData('awaitingCompletionSessions')->pluck('id')->all());
+    }
+
+    public static function ongoingTimes(): array
+    {
+        return [
+            'exact start' => ['2026-09-09 07:00:00'],
+            'mid-session' => ['2026-09-09 07:30:00'],
+            'one second before end' => ['2026-09-09 07:59:59'],
+            'one microsecond before end' => ['2026-09-09 07:59:59.999999'],
+        ];
+    }
+
+    public static function invalidStoredSchedules(): array
+    {
+        return [
+            'unparseable start' => ['scheduled_at', 'invalid-date'],
+            'impossible date' => ['scheduled_at', '2026-02-30 07:00:00'],
+            'zero duration' => ['duration_minutes', 0],
+            'negative duration' => ['duration_minutes', -30],
+            'malformed duration' => ['duration_minutes', 'invalid'],
+        ];
+    }
+
+    public static function ineligibleSwapStatuses(): array
+    {
+        return [
+            'pending' => [SwapRequest::STATUS_PENDING],
+            'rejected' => [SwapRequest::STATUS_REJECTED],
+            'cancelled' => [SwapRequest::STATUS_CANCELLED],
+        ];
     }
 
     public function test_proposed_and_cancelled_sessions_cannot_be_confirmed_complete(): void
@@ -131,7 +271,7 @@ class SkillSessionCompletionControllerTest extends TestCase
                 ->assertSessionHas('info', 'Only a confirmed session can be completed.');
         }
 
-        $this->assertDatabaseCount('credit_transactions', 0);
+        $this->assertSame(0, CreditTransaction::where('reason', CreditTransaction::REASON_SESSION_COMPLETED)->count());
     }
 
     public function test_guest_unrelated_admin_and_incomplete_participant_cannot_confirm_completion(): void
@@ -147,7 +287,7 @@ class SkillSessionCompletionControllerTest extends TestCase
         $sender->update(['onboarding_completed' => false]);
         $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))
             ->assertRedirect(route('onboarding.welcome'));
-        $this->assertDatabaseCount('credit_transactions', 0);
+        $this->assertSame(0, CreditTransaction::where('reason', CreditTransaction::REASON_SESSION_COMPLETED)->count());
     }
 
     public function test_database_uniqueness_prevents_duplicate_session_reward(): void
@@ -183,9 +323,9 @@ class SkillSessionCompletionControllerTest extends TestCase
             $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session));
         }
 
-        $this->assertSame(2, $sender->fresh()->skill_credits);
-        $this->assertSame(2, $recipient->fresh()->skill_credits);
-        $this->assertDatabaseCount('credit_transactions', 4);
+        $this->assertSame(3, $sender->fresh()->skill_credits);
+        $this->assertSame(3, $recipient->fresh()->skill_credits);
+        $this->assertDatabaseCount('credit_transactions', 6);
     }
 
     public function test_chat_remains_active_and_accepts_messages_after_first_confirmation(): void
@@ -267,7 +407,7 @@ class SkillSessionCompletionControllerTest extends TestCase
             ->assertSee('You taught: TypeScript')->assertSee('You learned: PHP')
             ->assertSee('+1 Skill Credit earned')->assertSee('View Conversation')
             ->assertDontSee('No completed swaps yet.');
-        $this->assertSame(1, $senderDashboard->viewData('user')->skill_credits);
+        $this->assertSame(2, $senderDashboard->viewData('user')->skill_credits);
         $this->actingAs($recipient)->get(route('dashboard'))
             ->assertSee('With Jiro')->assertSee('You taught: PHP')->assertSee('You learned: TypeScript');
         $this->assertFalse($this->dashboardCollectionContains($sender, 'acceptedSwapRequests', $swapRequest->id));
@@ -311,6 +451,7 @@ class SkillSessionCompletionControllerTest extends TestCase
         $session = SkillSession::create([
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $sender->id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'scheduled_at' => '2026-09-09 07:00:00',
             'duration_minutes' => 60,
             'meeting_type' => SkillSession::MEETING_TYPE_ONLINE,
@@ -328,10 +469,11 @@ class SkillSessionCompletionControllerTest extends TestCase
         return $this->actingAs($user)->get(route('dashboard'))->viewData($key)->contains('id', $modelId);
     }
 
-    /** @return array{date: string, time: string, duration_minutes: int, meeting_type: string} */
+    /** @return array{teaching_side: string, date: string, time: string, duration_minutes: int, meeting_type: string} */
     private function proposalPayload(): array
     {
         return [
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'date' => now()->addDay()->format('Y-m-d'),
             'time' => '15:00',
             'duration_minutes' => 60,

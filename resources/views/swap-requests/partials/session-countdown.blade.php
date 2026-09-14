@@ -80,7 +80,7 @@
 
             if (now >= endsAt) {
                 card.className = 'countdown countdown-ended';
-                label.textContent = 'Session ended';
+                label.textContent = 'Session ended — refresh to confirm completion.';
                 time.innerHTML = '&mdash;';
 
                 return true;

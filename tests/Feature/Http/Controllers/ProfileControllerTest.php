@@ -76,7 +76,7 @@ class ProfileControllerTest extends TestCase
 
     public function test_profile_shows_skill_credit_balance_and_recent_activity(): void
     {
-        $user = User::factory()->onboarded()->create(['skill_credits' => 3]);
+        $user = User::factory()->onboarded()->createQuietly(['skill_credits' => 3]);
         $session = $this->completedSession($user);
 
         CreditTransaction::create([
@@ -91,7 +91,7 @@ class ProfileControllerTest extends TestCase
             ->assertOk()
             ->assertSee('Skill Credits')
             ->assertSee('3')
-            ->assertSee('1 credit earned from completed sessions.')
+            ->assertSee('1 credit received.')
             ->assertSee('Session completed');
     }
 
@@ -166,7 +166,7 @@ class ProfileControllerTest extends TestCase
 
     public function test_empty_profile_renders_helpful_placeholders(): void
     {
-        $user = User::factory()->onboarded()->create(['bio' => null]);
+        $user = User::factory()->onboarded()->createQuietly(['bio' => null]);
 
         $this->actingAs($user)
             ->get(route('profile.show'))
@@ -195,6 +195,7 @@ class ProfileControllerTest extends TestCase
         return SkillSession::create([
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $partner->id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'scheduled_at' => now()->subDay(),
             'duration_minutes' => 60,
             'meeting_type' => SkillSession::MEETING_TYPE_ONLINE,

@@ -34,7 +34,11 @@ class SkillSessionCompletionController extends Controller
                 return 'not_confirmed';
             }
 
-            if ($lockedSession->scheduled_at->isFuture()) {
+            if ($lockedSession->endsAt() === null) {
+                return 'invalid_schedule';
+            }
+
+            if (! $lockedSession->hasEnded()) {
                 return 'too_early';
             }
 
@@ -94,7 +98,10 @@ class SkillSessionCompletionController extends Controller
                 ->with('success', 'Skill swap completed! You each earned +1 Skill Credit.'),
             'too_early' => redirect()
                 ->route('swap-requests.chat', $skillSession->swap_request_id)
-                ->with('info', 'Completion can be confirmed after the session starts.'),
+                ->with('info', 'This session can only be marked complete after it has ended.'),
+            'invalid_schedule' => redirect()
+                ->route('swap-requests.chat', $skillSession->swap_request_id)
+                ->with('info', 'This session cannot be marked complete because its schedule is missing or invalid.'),
             'already_confirmed' => redirect()
                 ->route('swap-requests.chat', $skillSession->swap_request_id)
                 ->with('info', 'You have already confirmed completion.'),

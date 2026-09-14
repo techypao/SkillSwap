@@ -114,7 +114,7 @@ class SwapChatControllerTest extends TestCase
             ->assertOk()->assertSee('Session Confirmed')->assertSee('SESSION CONFIRMED')
             ->assertSee('90 minutes · Online')
             ->assertSee('href="https://meet.example.test/room"', false)
-            ->assertSee('Completion can be confirmed after the session starts.')
+            ->assertSee('Completion available after the session ends.')
             ->assertDontSee('Confirm Session Completed')->assertDontSee('>Agree<', false)
             ->assertSee('Send Message');
     }
@@ -131,17 +131,17 @@ class SwapChatControllerTest extends TestCase
             ->assertDontSee('href="javascript:', false);
     }
 
-    public function test_started_confirmed_session_shows_completion_action(): void
+    public function test_confirmed_session_shows_completion_action_at_its_exact_end(): void
     {
         $this->travelTo('2026-09-10 08:00:00');
         [$sender, , $swapRequest] = $this->createSwapRequest();
-        $this->createConfirmedSession($swapRequest, now()->copy()->subMinutes(10), 60);
+        $this->createConfirmedSession($swapRequest, now()->copy()->subMinutes(60), 60);
 
         $this->actingAs($sender)->get(route('swap-requests.chat', $swapRequest))
             ->assertOk()->assertSee('Awaiting Completion')->assertSee('Session Completion')
             ->assertSee('Confirm Session Completed')
             ->assertSee(route('skill-sessions.completion.store', $swapRequest->skillSession), false)
-            ->assertDontSee('Completion can be confirmed after the session starts.');
+            ->assertDontSee('Completion available after the session ends.');
     }
 
     public function test_completed_workspace_is_read_only(): void
@@ -196,6 +196,7 @@ class SwapChatControllerTest extends TestCase
         $this->assertDatabaseHas('skill_sessions', [
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $sender->id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'scheduled_at' => '2026-09-16 15:00:00',
             'duration_minutes' => 90,
             'meeting_type' => SkillSession::MEETING_TYPE_IN_PERSON,
@@ -221,6 +222,7 @@ class SwapChatControllerTest extends TestCase
         [$sender, , $swapRequest] = $this->createSwapRequest();
         $payload = [
             ...$this->inlineProposalPayload(),
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'date' => '2026-09-01',
             'meeting_details' => 'Room <b>7</b>',
         ];
@@ -268,6 +270,7 @@ class SwapChatControllerTest extends TestCase
         $this->assertDatabaseHas('skill_sessions', [
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $recipient->id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'duration_minutes' => 75,
         ]);
         $this->actingAs($recipient)->get(route('swap-requests.chat', $swapRequest))
@@ -522,6 +525,7 @@ class SwapChatControllerTest extends TestCase
         SkillSession::create([
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $sender->id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'scheduled_at' => now()->copy()->addHours(3),
             'duration_minutes' => 60,
             'meeting_type' => 'online',
@@ -539,6 +543,7 @@ class SwapChatControllerTest extends TestCase
     private function inlineProposalPayload(): array
     {
         return [
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'date' => '2026-09-16',
             'time' => '15:00',
             'duration_minutes' => '90',
@@ -552,6 +557,7 @@ class SwapChatControllerTest extends TestCase
         return SkillSession::create([
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $swapRequest->sender_id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'scheduled_at' => now()->copy()->addDay(),
             'duration_minutes' => 60,
             'meeting_type' => 'online',
@@ -568,6 +574,7 @@ class SwapChatControllerTest extends TestCase
         return SkillSession::create([
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $swapRequest->sender_id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'scheduled_at' => $scheduledAt,
             'duration_minutes' => $durationMinutes,
             'meeting_type' => 'online',

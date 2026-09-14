@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\SkillSession;
 use App\Models\SwapRequest;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -73,7 +74,7 @@ class UserDashboardController extends Controller
             ->take(5)
             ->get();
 
-        $awaitingCompletionSessions = SkillSession::query()
+        $awaitingCompletionSessions = new Collection(SkillSession::query()
             ->where('status', SkillSession::STATUS_CONFIRMED)
             ->where('scheduled_at', '<=', now())
             ->whereHas('swapRequest', function (Builder $query) use ($user): void {
@@ -82,8 +83,11 @@ class UserDashboardController extends Controller
             })
             ->with(['swapRequest.sender', 'swapRequest.recipient'])
             ->orderByDesc('scheduled_at')
+            ->orderByDesc('id')
+            ->lazy()
+            ->filter(fn (SkillSession $session): bool => $session->hasEnded())
             ->take(5)
-            ->get();
+            ->all());
 
         $completedSwapRequests = SwapRequest::query()
             ->where('status', SwapRequest::STATUS_ACCEPTED)

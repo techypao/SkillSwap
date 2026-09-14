@@ -65,6 +65,10 @@ class SkillSessionController extends Controller
         abort_unless($swapRequest->status === SwapRequest::STATUS_ACCEPTED, 403);
 
         $validated = $request->validate([
+            'teaching_side' => ['required', Rule::in([
+                SkillSession::TEACHING_SIDE_SENDER,
+                SkillSession::TEACHING_SIDE_RECIPIENT,
+            ])],
             'date' => ['required', 'date_format:Y-m-d'],
             'time' => ['required', 'date_format:H:i'],
             'duration_minutes' => [
@@ -106,6 +110,7 @@ class SkillSessionController extends Controller
             }
 
             $proposalAttributes = [
+                'teaching_side' => $validated['teaching_side'],
                 'scheduled_by' => $request->user()->id,
                 'scheduled_at' => $scheduledAt,
                 'duration_minutes' => $validated['duration_minutes'],

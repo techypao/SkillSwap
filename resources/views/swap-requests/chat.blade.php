@@ -4,12 +4,13 @@
     $skillSession = $swapRequest->skillSession;
     $isCompleted = $skillSession?->status === SkillSession::STATUS_COMPLETED;
     $hasActiveSession = $skillSession && $skillSession->status !== SkillSession::STATUS_CANCELLED;
-    $sessionHasStarted = $skillSession?->status === SkillSession::STATUS_CONFIRMED && $skillSession->hasStarted();
+    $sessionEndsAt = $skillSession?->endsAt();
+    $sessionHasEnded = $skillSession?->status === SkillSession::STATUS_CONFIRMED && $skillSession->hasEnded();
     $meetingDetailsIsLink = $skillSession?->meeting_details
         && \Illuminate\Support\Str::startsWith($skillSession->meeting_details, ['http://', 'https://'])
         && filter_var($skillSession->meeting_details, FILTER_VALIDATE_URL);
     $formatMeetingType = fn (string $meetingType): string => ucwords(str_replace('_', ' ', $meetingType));
-    $proposalFields = ['date', 'time', 'duration_minutes', 'meeting_type', 'meeting_details'];
+    $proposalFields = ['teaching_side', 'date', 'time', 'duration_minutes', 'meeting_type', 'meeting_details'];
     $proposalHasErrors = $errors->hasAny($proposalFields);
     $selectedDuration = old('duration_minutes', 60);
     $selectedMeetingType = old('meeting_type', SkillSession::MEETING_TYPE_ONLINE);
@@ -480,6 +481,19 @@
                         <p class="section-label">Propose a session</p>
 
                         <div class="field">
+                            <label for="proposal_teaching_side">Who will teach this session?</label>
+                            <select id="proposal_teaching_side" name="teaching_side" required @error('teaching_side') aria-invalid="true" @enderror>
+                                <option value="">Choose a teacher and skill</option>
+                                <option value="sender" @selected(old('teaching_side') === 'sender')>{{ $swapRequest->sender->name }} teaches {{ $swapRequest->offeredSkill->name }} to {{ $swapRequest->recipient->name }} — Learner Skill Credits: {{ $swapRequest->recipient->skill_credits }}</option>
+                                <option value="recipient" @selected(old('teaching_side') === 'recipient')>{{ $swapRequest->recipient->name }} teaches {{ $swapRequest->requestedSkill->name }} to {{ $swapRequest->sender->name }} — Learner Skill Credits: {{ $swapRequest->sender->skill_credits }}</option>
+                            </select>
+                            <p class="field-hint">The learner needs at least 1 Skill Credit. Proposing a session does not spend credits.</p>
+                            @error('teaching_side')
+                                <p class="field-error">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div class="field">
                             <label for="proposal_date">Date</label>
                             <input id="proposal_date" type="date" name="date" value="{{ old('date') }}" min="{{ now()->format('Y-m-d') }}" required @error('date') aria-invalid="true" @enderror>
                             @error('date')
@@ -558,27 +572,38 @@
                     <p class="primary-state primary-state-{{ $sessionStage['key'] }}">
                         @if ($skillSession->status === SkillSession::STATUS_PROPOSED)
                             SESSION PROPOSAL
-                        @elseif ($sessionHasStarted)
+                        @elseif ($sessionHasEnded)
                             AWAITING COMPLETION
                         @else
                             SESSION CONFIRMED <span class="check">✓</span>
                         @endif
                     </p>
 
-                    @if ($skillSession->status === SkillSession::STATUS_CONFIRMED && ! $skillSession->hasEnded())
+                    @if ($sessionEndsAt && $skillSession->status === SkillSession::STATUS_CONFIRMED && ! $sessionHasEnded)
                         @include('swap-requests.partials.session-countdown', ['skillSession' => $skillSession])
                     @endif
 
                     <div class="session-card {{ $skillSession->status === SkillSession::STATUS_CONFIRMED ? 'success' : 'highlight' }}">
-                        <div class="date-tile" aria-hidden="true">
-                            <div class="date-tile-month">{{ $skillSession->scheduled_at->format('M') }}</div>
-                            <div class="date-tile-day">{{ $skillSession->scheduled_at->format('j') }}</div>
-                        </div>
+                        @if ($sessionEndsAt)
+                            <div class="date-tile" aria-hidden="true">
+                                <div class="date-tile-month">{{ $skillSession->scheduled_at->format('M') }}</div>
+                                <div class="date-tile-day">{{ $skillSession->scheduled_at->format('j') }}</div>
+                            </div>
+                        @endif
                         <div class="session-facts">
-                            <p class="primary">{{ $skillSession->scheduled_at->format('F j, Y') }}</p>
-                            <p>{{ $skillSession->scheduled_at->format('g:i A') }} – {{ $skillSession->endsAt()->format('g:i A') }}</p>
-                            <p class="muted small">{{ $skillSession->duration_minutes }} minutes · {{ $formatMeetingType($skillSession->meeting_type) }}</p>
+                            @if ($sessionEndsAt)
+                                <p class="primary">{{ $skillSession->scheduled_at->format('F j, Y') }}</p>
+                                <p>{{ $skillSession->scheduled_at->format('g:i A') }} – {{ $sessionEndsAt->format('g:i A') }}</p>
+                                <p class="muted small">{{ $skillSession->duration_minutes }} minutes · {{ $formatMeetingType($skillSession->meeting_type) }}</p>
+                            @else
+                                <p class="muted small">This session cannot be marked complete because its schedule is missing or invalid.</p>
+                            @endif
                             <p class="muted small">Proposed by {{ $skillSession->scheduledBy->name }}</p>
+                            @if ($skillSession->hasResolvedRoles())
+                                <p class="muted small">{{ $skillSession->teacher->name }} teaches {{ $skillSession->taughtSkill->name }} to {{ $skillSession->learner->name }}</p>
+                            @else
+                                <p class="muted small">Teaching direction was not recorded for this session.</p>
+                            @endif
                         </div>
                     </div>
 
@@ -605,13 +630,13 @@
                                 </form>
                             </div>
                         @endif
-                    @elseif ($skillSession->scheduled_at->isFuture())
-                        <p class="note muted small">Completion can be confirmed after the session starts.</p>
+                    @elseif ($sessionEndsAt && ! $sessionHasEnded)
+                        <p class="note muted small">Completion available after the session ends.</p>
                     @endif
                 @endif
             </div>
 
-            @if ($sessionHasStarted)
+            @if ($sessionHasEnded)
                 <div class="panel-section">
                     <p class="section-label">Session Completion</p>
 

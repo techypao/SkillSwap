@@ -37,6 +37,32 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
+    protected static function booted(): void
+    {
+        static::created(function (User $user): void {
+            $user->creditTransactions()->create([
+                'amount' => 1,
+                'reason' => CreditTransaction::REASON_WELCOME_BONUS,
+            ]);
+
+            $user->increment('skill_credits');
+        });
+    }
+
+    /**
+     * Keep a new account and its welcome credit in the same transaction.
+     *
+     * @param  array<string, mixed>  $options
+     */
+    public function save(array $options = []): bool
+    {
+        if ($this->exists) {
+            return parent::save($options);
+        }
+
+        return $this->getConnection()->transaction(fn (): bool => parent::save($options));
+    }
+
     /**
      * Get the attributes that should be cast.
      *

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CreditTransaction extends Model
 {
+    public const REASON_WELCOME_BONUS = 'welcome_bonus';
+
     public const REASON_SESSION_COMPLETED = 'session_completed';
 
     protected $fillable = [

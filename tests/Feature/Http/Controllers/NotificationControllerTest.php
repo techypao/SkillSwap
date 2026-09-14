@@ -88,6 +88,7 @@ class NotificationControllerTest extends TestCase
         $this->travelTo('2026-09-09 08:00:00');
 
         $this->actingAs($sender)->post(route('skill-sessions.store', $swapRequest), [
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'date' => '2026-09-12',
             'time' => '15:00',
             'duration_minutes' => '60',
@@ -283,6 +284,7 @@ class NotificationControllerTest extends TestCase
         return SkillSession::create([
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $proposer->id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'scheduled_at' => '2026-09-12 15:00:00',
             'duration_minutes' => 60,
             'meeting_type' => SkillSession::MEETING_TYPE_ONLINE,

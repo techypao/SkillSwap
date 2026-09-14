@@ -395,7 +395,7 @@
                 </div>
 
                 <p class="muted">
-                    {{ $creditsEarned }} credit{{ $creditsEarned === 1 ? '' : 's' }} earned from completed sessions.
+                    {{ $creditsEarned }} credit{{ $creditsEarned === 1 ? '' : 's' }} received.
                 </p>
 
             </div>

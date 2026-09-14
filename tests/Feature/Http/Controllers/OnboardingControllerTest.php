@@ -32,6 +32,13 @@ class OnboardingControllerTest extends TestCase
             'year_level' => 4,
             'school_organization' => 'FEU Institute of Technology',
         ]);
+
+        $this->actingAs($user)
+            ->post(route('onboarding.profile.store'), $this->profilePayload($program, 3))
+            ->assertRedirect(route('onboarding.skills.teach'));
+
+        $this->assertSame(1, $user->fresh()->skill_credits);
+        $this->assertSame(1, $user->creditTransactions()->where('reason', 'welcome_bonus')->count());
     }
 
     public function test_invalid_and_inactive_programs_are_rejected(): void
@@ -139,6 +146,26 @@ class OnboardingControllerTest extends TestCase
             ->assertSessionHasErrors('learning_skills');
 
         $this->assertDatabaseCount('user_skills', 0);
+    }
+
+    public function test_completing_onboarding_and_resubmitting_it_does_not_repeat_the_welcome_credit(): void
+    {
+        $user = $this->userWithCompletedProfile();
+        $teachingSkill = $this->createApprovedSkill('Teaching Skill');
+        $learningSkill = $this->createApprovedSkill('Learning Skill');
+        $user->teachingSkills()->attach($teachingSkill, ['type' => 'teach']);
+        $user->learningSkills()->attach($learningSkill, ['type' => 'learn']);
+        $payload = ['availability' => ['monday' => ['morning' => '1']]];
+
+        $this->actingAs($user)->post(route('onboarding.availability.store'), $payload)
+            ->assertRedirect(route('dashboard'))->assertSessionHasNoErrors();
+
+        $this->assertTrue($user->fresh()->onboarding_completed);
+        $this->post(route('onboarding.availability.store'), $payload)->assertRedirect(route('dashboard'));
+        $this->assertSame(1, $user->fresh()->skill_credits);
+        $transaction = $user->creditTransactions()->sole();
+        $this->assertSame('welcome_bonus', $transaction->reason);
+        $this->assertSame(1, $transaction->amount);
     }
 
     public function test_unapproved_skill_from_another_user_cannot_be_selected(): void

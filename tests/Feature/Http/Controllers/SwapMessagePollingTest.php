@@ -113,6 +113,7 @@ class SwapMessagePollingTest extends TestCase
         SkillSession::create([
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $sender->id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'scheduled_at' => now()->subDay(),
             'duration_minutes' => 60,
             'meeting_type' => 'online',

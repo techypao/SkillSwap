@@ -284,6 +284,7 @@ class ReviewControllerTest extends TestCase
         $session = SkillSession::create([
             'swap_request_id' => $swapRequest->id,
             'scheduled_by' => $sender->id,
+            'teaching_side' => SkillSession::TEACHING_SIDE_SENDER,
             'scheduled_at' => '2026-09-09 07:00:00',
             'duration_minutes' => 60,
             'meeting_type' => SkillSession::MEETING_TYPE_ONLINE,
