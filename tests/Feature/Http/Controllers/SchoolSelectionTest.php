@@ -12,15 +12,15 @@ class SchoolSelectionTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
-    public function test_onboarding_page_shows_the_school_search(): void
+    public function test_onboarding_page_allows_a_school_outside_the_suggestion_list(): void
     {
         $this->actingAs(User::factory()->create())
             ->get(route('onboarding.profile'))
             ->assertOk()
             ->assertSee('School / University')
-            ->assertSee('Search your school...')
-            ->assertSee("Can't find your school?", false)
-            ->assertSee('Enter school manually')
+            ->assertSee('Search or enter your school...')
+            ->assertSee('name="school_organization"', false)
+            ->assertSee('Choose a suggestion or keep your typed school name.')
             ->assertSee(route('schools.search'));
     }
 
@@ -101,7 +101,7 @@ class SchoolSelectionTest extends TestCase
         $this->actingAs($user)
             ->post(route('onboarding.profile.store'), [...$this->profilePayload(), 'school_id' => ''])
             ->assertSessionHasErrors([
-                'school_organization' => 'Please select your school or enter it manually.',
+                'school_organization' => 'Please select your school or enter your school name.',
             ]);
     }
 

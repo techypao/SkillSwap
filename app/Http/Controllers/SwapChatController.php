@@ -39,6 +39,7 @@ class SwapChatController extends Controller
             'skillSession.scheduledBy',
             'skillSession.reviews' => fn ($query) => $query->where('reviewer_id', $request->user()->id),
         ]);
+        $swapRequest->skillSession?->setRelation('swapRequest', $swapRequest);
 
         $currentUserIsSender = $request->user()->id === $swapRequest->sender_id;
         $currentUser = $currentUserIsSender ? $swapRequest->sender : $swapRequest->recipient;

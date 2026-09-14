@@ -328,10 +328,10 @@
 
                 <div class="header-main">
                     <h1 class="header-name">{{ $otherUser->name }}</h1>
-                    @if ($otherUser->program || $otherUser->year_level)
+                    @if ($otherUser->program_display_name || $otherUser->year_level)
                         <p class="header-sub">
-                            {{ $otherUser->program?->name }}
-                            @if ($otherUser->program && $otherUser->year_level)
+                            {{ $otherUser->program_display_name }}
+                            @if ($otherUser->program_display_name && $otherUser->year_level)
                                 &bull;
                             @endif
                             @if ($otherUser->year_level)
@@ -431,7 +431,11 @@
                             <p class="small muted">Both participants confirmed completion.</p>
                             <p>{{ ($skillSession->completed_at ?? $skillSession->scheduled_at)->format('F j, Y') }}</p>
                             <p class="small">{{ $skillYouTeach->name }} ↔ {{ $skillYouLearn->name }}</p>
-                            <p class="credit">+1 Skill Credit earned</p>
+                            @if ($skillSession->teacher?->is(auth()->user()))
+                                <p class="credit">+1 Skill Credit earned</p>
+                            @elseif ($skillSession->learner?->is(auth()->user()))
+                                <p class="credit">−1 Skill Credit spent</p>
+                            @endif
                         </div>
                     </div>
 

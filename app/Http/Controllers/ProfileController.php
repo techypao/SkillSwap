@@ -20,7 +20,10 @@ class ProfileController extends Controller
             'reviewsReceived' => fn ($query) => $query->with('reviewer')
                 ->latest()
                 ->latest('id'),
-            'creditTransactions' => fn ($query) => $query->with('skillSession.swapRequest')
+            'creditTransactions' => fn ($query) => $query->with([
+                'skillSession.swapRequest.offeredSkill',
+                'skillSession.swapRequest.requestedSkill',
+            ])
                 ->latest()
                 ->latest('id')
                 ->take(10),
@@ -32,11 +35,14 @@ class ProfileController extends Controller
         $creditsEarned = (int) $user->creditTransactions()
             ->where('amount', '>', 0)
             ->sum('amount');
+        $creditsSpent = abs((int) $user->creditTransactions()
+            ->where('amount', '<', 0)
+            ->sum('amount'));
 
         $ratingBreakdown = $user->reviewsReceived
             ->countBy('rating')
             ->all();
 
-        return view('profile.show', compact('user', 'creditsEarned', 'ratingBreakdown'));
+        return view('profile.show', compact('user', 'creditsEarned', 'creditsSpent', 'ratingBreakdown'));
     }
 }

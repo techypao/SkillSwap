@@ -49,7 +49,7 @@ class OnboardingController extends Controller
             return $redirect;
         }
 
-        $validated = $request->validatedWithSchool();
+        $validated = $request->validatedAcademicProfile();
 
         if ($request->hasFile('profile_picture')) {
             $validated['profile_picture'] = $request->file('profile_picture')
@@ -235,7 +235,7 @@ class OnboardingController extends Controller
     private function hasProfileDetails(User $user): bool
     {
         return (bool) ($user->school_organization
-            && $user->program_id
+            && ($user->program_id || $user->program_name)
             && $user->year_level
             && $user->bio);
     }

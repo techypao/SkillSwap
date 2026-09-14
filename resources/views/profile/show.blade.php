@@ -344,7 +344,7 @@
                     </p>
 
                     <p class="muted">
-                        {{ $user->program?->name ?: 'Program not set' }}
+                        {{ $user->program_display_name ?: 'Program not set' }}
                         @if ($user->year_level)
                             &middot; Year {{ $user->year_level }}
                         @endif
@@ -390,12 +390,18 @@
                     Skill Credits
                 </h2>
 
+                <p class="muted">
+                    Current Balance
+                </p>
+
                 <div class="credits">
                     {{ $user->skill_credits }}
                 </div>
 
                 <p class="muted">
-                    {{ $creditsEarned }} credit{{ $creditsEarned === 1 ? '' : 's' }} received.
+                    Total Earned: {{ $creditsEarned }}
+                    <br>
+                    Total Spent: {{ $creditsSpent }}
                 </p>
 
             </div>
@@ -577,7 +583,7 @@
                                 </td>
 
                                 <td>
-                                    {{ ucfirst(str_replace('_', ' ', $creditTransaction->reason)) }}
+                                    {{ $creditTransaction->display_label }}
                                 </td>
 
                                 <td class="{{ $creditTransaction->amount > 0 ? 'amount-positive' : '' }}">

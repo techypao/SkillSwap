@@ -1,13 +1,13 @@
 {{--
     Program picker.
 
-    Type-to-search over the active programs already loaded for the page. It
-    submits program_id only; the server still validates it against active
-    programs.
+    A catalog pick submits program_id. Any other typed value submits as a
+    custom program_name, so students are not limited to the suggestion list.
 --}}
 @php
     $selectedProgramId = (string) old('program_id', $user->program_id);
     $selectedProgram = $programs->first(fn ($program): bool => (string) $program->id === $selectedProgramId);
+    $customProgramName = $selectedProgram ? '' : old('program_name', $user->program_name);
     $programOptions = $programs->map(fn ($program): array => [
         'id' => $program->id,
         'name' => $program->name,
@@ -43,15 +43,20 @@
         <div class="relative">
             <input
                 type="text"
+                name="program_name"
                 id="program_search"
+                value="{{ $customProgramName }}"
                 autocomplete="off"
-                placeholder="Search your program..."
+                placeholder="Search or enter your program..."
+                maxlength="255"
                 role="combobox"
                 aria-autocomplete="list"
                 aria-expanded="false"
                 aria-controls="program_suggestions"
                 class="w-full border border-gray-300 rounded-xl px-4 py-3
                        focus:outline-none focus:ring-2 focus:ring-gray-900"
+                @disabled($selectedProgram)
+                @required(! $selectedProgram)
                 data-program-search
             >
 
@@ -65,10 +70,20 @@
             </div>
         </div>
 
-        <p class="text-sm text-gray-500 mt-2" data-program-empty hidden>No matching programs found.</p>
+        <p class="text-sm text-gray-500 mt-2" data-program-empty hidden>
+            No matching programs found. You can continue with the program name you entered.
+        </p>
     </div>
 
+    <p class="text-sm text-gray-600 mt-2" data-program-help @if ($selectedProgram) hidden @endif>
+        Choose a suggestion or keep your typed program name.
+    </p>
+
     @error('program_id')
+        <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+    @enderror
+
+    @error('program_name')
         <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
     @enderror
 </div>
@@ -86,6 +101,7 @@
             const suggestionsWrapper = picker.querySelector('[data-program-suggestions-wrapper]');
             const suggestions = picker.querySelector('[data-program-suggestions]');
             const empty = picker.querySelector('[data-program-empty]');
+            const help = picker.querySelector('[data-program-help]');
 
             let results = [];
             let activeIndex = -1;
@@ -129,8 +145,12 @@
             const showSearch = () => {
                 selectedPanel.hidden = true;
                 searchPanel.hidden = false;
+                help.hidden = false;
                 programId.value = '';
                 search.value = '';
+                search.disabled = false;
+                search.required = true;
+                closeSuggestions();
                 search.focus();
             };
 
@@ -140,7 +160,10 @@
                 selectedAbbreviation.textContent = program.abbreviation ?? '';
                 selectedPanel.hidden = false;
                 searchPanel.hidden = true;
+                help.hidden = true;
                 search.value = '';
+                search.disabled = true;
+                search.required = false;
                 closeSuggestions();
             };
 

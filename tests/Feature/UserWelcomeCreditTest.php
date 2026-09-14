@@ -26,6 +26,7 @@ class UserWelcomeCreditTest extends TestCase
         $this->assertSame('welcome_bonus', $transaction->reason);
         $this->assertSame(1, $transaction->amount);
         $this->assertNull($transaction->skill_session_id);
+        $this->assertSame($user->creditTransactions()->sum('amount'), $user->fresh()->skill_credits);
     }
 
     public function test_login_and_repeated_profile_views_do_not_repeat_the_welcome_credit(): void
@@ -36,7 +37,10 @@ class UserWelcomeCreditTest extends TestCase
             ->assertRedirect(route('dashboard'));
         $this->assertAuthenticatedAs($user);
 
-        $this->get(route('profile.show'))->assertSee('Welcome bonus')->assertSee('1 credit received.');
+        $this->get(route('profile.show'))
+            ->assertSee('Welcome to SkillSwap')
+            ->assertSee('Total Earned: 1')
+            ->assertSee('Total Spent: 0');
         $this->get(route('profile.show'))->assertOk();
         $this->post(route('logout'))->assertRedirect(route('login'));
         $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])

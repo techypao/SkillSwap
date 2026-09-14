@@ -29,6 +29,7 @@ class OnboardingControllerTest extends TestCase
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
             'program_id' => $program->id,
+            'program_name' => 'Bachelor of Science in Information Technology',
             'year_level' => 4,
             'school_organization' => 'FEU Institute of Technology',
         ]);

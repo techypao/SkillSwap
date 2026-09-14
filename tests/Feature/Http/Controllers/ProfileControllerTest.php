@@ -10,6 +10,7 @@ use App\Models\SkillSession;
 use App\Models\SwapRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ProfileControllerTest extends TestCase
@@ -74,25 +75,157 @@ class ProfileControllerTest extends TestCase
             ->assertSee('Figma');
     }
 
-    public function test_profile_shows_skill_credit_balance_and_recent_activity(): void
+    public function test_profile_shows_current_balance_earned_spent_and_friendly_transaction_labels(): void
     {
         $user = User::factory()->onboarded()->createQuietly(['skill_credits' => 3]);
         $session = $this->completedSession($user);
+        $skillName = $session->taughtSkill->name;
 
         CreditTransaction::create([
             'user_id' => $user->id,
-            'skill_session_id' => $session->id,
+            'skill_session_id' => null,
             'amount' => 1,
-            'reason' => CreditTransaction::REASON_SESSION_COMPLETED,
+            'reason' => CreditTransaction::REASON_WELCOME_BONUS,
+        ]);
+        CreditTransaction::create([
+            'user_id' => $user->id,
+            'skill_session_id' => $session->id,
+            'amount' => 4,
+            'reason' => CreditTransaction::REASON_SESSION_TAUGHT,
+        ]);
+        CreditTransaction::create([
+            'user_id' => $user->id,
+            'skill_session_id' => $session->id,
+            'amount' => -2,
+            'reason' => CreditTransaction::REASON_SESSION_LEARNED,
         ]);
 
-        $this->actingAs($user)
-            ->get(route('profile.show'))
+        $response = $this->actingAs($user)->get(route('profile.show'))
             ->assertOk()
             ->assertSee('Skill Credits')
-            ->assertSee('3')
-            ->assertSee('1 credit received.')
-            ->assertSee('Session completed');
+            ->assertSee('Current Balance')
+            ->assertSee('Total Earned: 5')
+            ->assertSee('Total Spent: 2')
+            ->assertSee('Welcome to SkillSwap')
+            ->assertSee('Taught '.$skillName)
+            ->assertSee('Learned '.$skillName)
+            ->assertDontSee('welcome_bonus')
+            ->assertDontSee('session_taught')
+            ->assertDontSee('session_learned');
+
+        $this->assertSame(3, $response->viewData('user')->skill_credits);
+        $this->assertSame(5, $response->viewData('creditsEarned'));
+        $this->assertSame(2, $response->viewData('creditsSpent'));
+    }
+
+    public function test_profile_limits_credit_history_to_latest_ten_in_newest_first_order(): void
+    {
+        $user = User::factory()->onboarded()->createQuietly();
+        $transactionIds = [];
+
+        for ($index = 1; $index <= 12; $index++) {
+            $transaction = CreditTransaction::create([
+                'user_id' => $user->id,
+                'skill_session_id' => null,
+                'amount' => 1,
+                'reason' => 'test_event_'.$index,
+            ]);
+            DB::table('credit_transactions')->where('id', $transaction->id)->update([
+                'created_at' => sprintf('2026-09-%02d 08:00:00', $index),
+                'updated_at' => sprintf('2026-09-%02d 08:00:00', $index),
+            ]);
+            $transactionIds[] = $transaction->id;
+        }
+
+        $response = $this->actingAs($user)->get(route('profile.show'))->assertOk();
+
+        $expectedIds = array_reverse(array_slice($transactionIds, 2));
+        $this->assertSame($expectedIds, $response->viewData('user')->creditTransactions->pluck('id')->all());
+        $this->assertCount(10, $response->viewData('user')->creditTransactions);
+    }
+
+    public function test_session_deletion_preserves_both_participants_ledger_and_balances_with_safe_labels(): void
+    {
+        $teacher = User::factory()->onboarded()->create();
+        $learner = User::factory()->onboarded()->create();
+        $session = $this->completedSession($learner, $teacher);
+        $teacherTransaction = CreditTransaction::create([
+            'user_id' => $teacher->id,
+            'skill_session_id' => $session->id,
+            'amount' => 1,
+            'reason' => CreditTransaction::REASON_SESSION_TAUGHT,
+        ]);
+        $learnerTransaction = CreditTransaction::create([
+            'user_id' => $learner->id,
+            'skill_session_id' => $session->id,
+            'amount' => -1,
+            'reason' => CreditTransaction::REASON_SESSION_LEARNED,
+        ]);
+        $teacher->increment('skill_credits');
+        $learner->decrement('skill_credits');
+
+        $session->delete();
+
+        $this->assertDatabaseHas('credit_transactions', [
+            'id' => $teacherTransaction->id,
+            'skill_session_id' => null,
+        ]);
+        $this->assertDatabaseHas('credit_transactions', [
+            'id' => $learnerTransaction->id,
+            'skill_session_id' => null,
+        ]);
+        $this->assertSame(2, $teacher->fresh()->skill_credits);
+        $this->assertSame(0, $learner->fresh()->skill_credits);
+        $this->assertBalanceMatchesLedger($teacher, $learner);
+        $this->assertNull($teacherTransaction->fresh()->skillSession);
+        $this->assertNull($learnerTransaction->fresh()->skillSession);
+        $this->actingAs($teacher)->get(route('profile.show'))
+            ->assertSee('Total Earned: 2')
+            ->assertSee('Total Spent: 0')
+            ->assertSee('Skill teaching session')
+            ->assertDontSee('session_taught');
+        $this->actingAs($learner)->get(route('profile.show'))
+            ->assertSee('Total Earned: 1')
+            ->assertSee('Total Spent: 1')
+            ->assertSee('Skill learning session')
+            ->assertDontSee('session_learned');
+    }
+
+    public function test_deleting_one_participant_preserves_the_surviving_participants_ledger(): void
+    {
+        $teacher = User::factory()->onboarded()->create();
+        $learner = User::factory()->onboarded()->create();
+        $session = $this->completedSession($learner, $teacher);
+        $teacherTransaction = CreditTransaction::create([
+            'user_id' => $teacher->id,
+            'skill_session_id' => $session->id,
+            'amount' => 1,
+            'reason' => CreditTransaction::REASON_SESSION_TAUGHT,
+        ]);
+        $learnerTransaction = CreditTransaction::create([
+            'user_id' => $learner->id,
+            'skill_session_id' => $session->id,
+            'amount' => -1,
+            'reason' => CreditTransaction::REASON_SESSION_LEARNED,
+        ]);
+        $learner->decrement('skill_credits');
+
+        $teacher->delete();
+
+        $this->assertDatabaseMissing('credit_transactions', ['id' => $teacherTransaction->id]);
+        $this->assertDatabaseHas('credit_transactions', [
+            'id' => $learnerTransaction->id,
+            'user_id' => $learner->id,
+            'skill_session_id' => null,
+            'amount' => -1,
+            'reason' => CreditTransaction::REASON_SESSION_LEARNED,
+        ]);
+        $this->assertSame(0, $learner->fresh()->skill_credits);
+        $this->assertBalanceMatchesLedger($learner);
+        $this->actingAs($learner)->get(route('profile.show'))
+            ->assertSee('Skill learning session')
+            ->assertDontSee('session_learned');
+        $this->actingAs($learner)->get(route('dashboard'))->assertOk();
     }
 
     public function test_profile_shows_reviews_written_about_the_user(): void
@@ -203,5 +336,16 @@ class ProfileControllerTest extends TestCase
             'status' => SkillSession::STATUS_COMPLETED,
             'completed_at' => now(),
         ]);
+    }
+
+    private function assertBalanceMatchesLedger(User ...$users): void
+    {
+        foreach ($users as $user) {
+            $this->assertSame(
+                $user->creditTransactions()->sum('amount'),
+                $user->fresh()->skill_credits,
+                'Stored Skill Credit balance must equal the ledger sum for user '.$user->id.'.'
+            );
+        }
     }
 }

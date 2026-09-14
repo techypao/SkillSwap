@@ -2,15 +2,14 @@
 
 namespace App\Http\Requests;
 
-use App\Http\Requests\Concerns\ValidatesSchoolSelection;
+use App\Http\Requests\Concerns\ValidatesAcademicProfile;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreOnboardingProfileRequest extends FormRequest
 {
-    use ValidatesSchoolSelection;
+    use ValidatesAcademicProfile;
 
     /**
      * Determine if the user is authorized to make this request.
@@ -29,14 +28,7 @@ class StoreOnboardingProfileRequest extends FormRequest
     {
         return [
             'profile_picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-            ...$this->schoolRules(),
-            'program_id' => [
-                'required',
-                'integer',
-                Rule::exists('programs', 'id')->where(
-                    fn (Builder $query): Builder => $query->where('is_active', true)
-                ),
-            ],
+            ...$this->academicProfileRules(),
             'year_level' => ['required', 'integer', Rule::in([1, 2, 3, 4, 5])],
             'bio' => ['required', 'string', 'max:500'],
         ];
@@ -47,6 +39,6 @@ class StoreOnboardingProfileRequest extends FormRequest
      */
     public function messages(): array
     {
-        return $this->schoolMessages();
+        return $this->academicProfileMessages();
     }
 }

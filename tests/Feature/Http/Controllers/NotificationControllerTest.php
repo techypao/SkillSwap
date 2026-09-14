@@ -159,7 +159,7 @@ class NotificationControllerTest extends TestCase
         $this->travelTo('2026-09-13 08:00:00');
 
         $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
-            ->assertSessionHas('success', 'Skill swap completed! You each earned +1 Skill Credit.');
+            ->assertSessionHas('success', 'Skill swap completed! The teacher earned 1 Skill Credit and the learner spent 1 Skill Credit.');
 
         $this->assertSame(0, $recipient->notifications()->count());
         $notification = $sender->notifications()->sole();

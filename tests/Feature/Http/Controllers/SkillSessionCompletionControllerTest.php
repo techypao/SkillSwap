@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -21,6 +22,8 @@ class SkillSessionCompletionControllerTest extends TestCase
     public function test_sender_first_confirmation_at_exact_end_records_timestamp_without_completing_or_awarding_credits(): void
     {
         [$sender, $recipient, , $session] = $this->createConfirmedSession();
+        $sender->update(['skill_credits' => 2]);
+        $recipient->update(['skill_credits' => 3]);
         $this->travelTo('2026-09-09 08:00:00');
 
         $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))
@@ -33,9 +36,9 @@ class SkillSessionCompletionControllerTest extends TestCase
             'recipient_confirmed_at' => null,
             'completed_at' => null,
         ]);
-        $this->assertSame(1, $sender->fresh()->skill_credits);
-        $this->assertSame(1, $recipient->fresh()->skill_credits);
-        $this->assertSame(0, CreditTransaction::where('reason', CreditTransaction::REASON_SESSION_COMPLETED)->count());
+        $this->assertSame(2, $sender->fresh()->skill_credits);
+        $this->assertSame(3, $recipient->fresh()->skill_credits);
+        $this->assertSame(0, $this->settlementTransactionCount($session));
     }
 
     public function test_recipient_confirmation_maps_to_recipient_timestamp(): void
@@ -54,35 +57,76 @@ class SkillSessionCompletionControllerTest extends TestCase
         ]);
     }
 
-    public function test_second_confirmation_completes_session_and_awards_each_participant_once(): void
+    public function test_first_confirmation_can_remain_pending_and_be_completed_later_without_credit_movement(): void
+    {
+        [$sender, $recipient, $swapRequest, $session] = $this->createConfirmedSession();
+        $this->travelTo('2026-09-09 08:00:00');
+
+        $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('success', 'You confirmed completion. Waiting for the other participant.');
+
+        $this->travelTo('2027-09-09 08:00:00');
+        $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('info', 'You have already confirmed completion.');
+
+        $this->assertDatabaseHas('skill_sessions', [
+            'id' => $session->id,
+            'status' => SkillSession::STATUS_CONFIRMED,
+            'recipient_confirmed_at' => null,
+            'completed_at' => null,
+        ]);
+        $this->assertSame(1, $sender->fresh()->skill_credits);
+        $this->assertSame(1, $recipient->fresh()->skill_credits);
+        $this->assertSame(0, $this->settlementTransactionCount($session));
+        $this->assertDatabaseCount('notifications', 1);
+        $this->assertBalanceMatchesLedger($sender, $recipient);
+        $this->actingAs($sender)->get(route('swap-requests.chat', $swapRequest))
+            ->assertOk()
+            ->assertSee('Waiting for Justine to confirm.');
+        $this->actingAs($sender)->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('You confirmed completion. Waiting for the other participant.');
+
+        $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('success', 'Skill swap completed! The teacher earned 1 Skill Credit and the learner spent 1 Skill Credit.');
+
+        $this->assertSame(SkillSession::STATUS_COMPLETED, $session->fresh()->status);
+        $this->assertSame(2, $this->settlementTransactionCount($session));
+        $this->assertBalanceMatchesLedger($sender, $recipient);
+    }
+
+    public function test_second_confirmation_credits_the_teacher_and_debits_the_learner_once(): void
     {
         [$sender, $recipient, , $session] = $this->createConfirmedSession([
             'sender_confirmed_at' => '2026-09-09 07:30:00',
         ]);
+        $sender->update(['skill_credits' => 0]);
         $this->travelTo('2026-09-09 08:00:00');
 
         $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
-            ->assertSessionHas('success', 'Skill swap completed! You each earned +1 Skill Credit.');
+            ->assertSessionHas('success', 'Skill swap completed! The teacher earned 1 Skill Credit and the learner spent 1 Skill Credit.');
 
         $this->assertDatabaseHas('skill_sessions', [
             'id' => $session->id,
             'status' => SkillSession::STATUS_COMPLETED,
             'completed_at' => '2026-09-09 08:00:00',
         ]);
-        $this->assertSame(2, $sender->fresh()->skill_credits);
-        $this->assertSame(2, $recipient->fresh()->skill_credits);
+        $this->assertSame(1, $sender->fresh()->skill_credits);
+        $this->assertSame(0, $recipient->fresh()->skill_credits);
         $this->assertDatabaseHas('credit_transactions', [
             'user_id' => $sender->id,
             'skill_session_id' => $session->id,
             'amount' => 1,
-            'reason' => CreditTransaction::REASON_SESSION_COMPLETED,
+            'reason' => CreditTransaction::REASON_SESSION_TAUGHT,
         ]);
         $this->assertDatabaseHas('credit_transactions', [
             'user_id' => $recipient->id,
             'skill_session_id' => $session->id,
-            'amount' => 1,
-            'reason' => CreditTransaction::REASON_SESSION_COMPLETED,
+            'amount' => -1,
+            'reason' => CreditTransaction::REASON_SESSION_LEARNED,
         ]);
+        $this->assertSame(0, CreditTransaction::where('reason', CreditTransaction::REASON_SESSION_COMPLETED)->count());
+        $this->assertSame(2, $this->settlementTransactionCount($session));
         $this->assertDatabaseCount('credit_transactions', 4);
     }
 
@@ -94,14 +138,190 @@ class SkillSessionCompletionControllerTest extends TestCase
         $this->travelTo('2026-09-09 08:00:00');
         $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session));
 
-        $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
-            ->assertSessionHas('info', 'This skill swap is already completed.');
-        $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))
-            ->assertSessionHas('info', 'This skill swap is already completed.');
+        foreach ([$recipient, $sender, $recipient, $sender] as $participant) {
+            $this->actingAs($participant)->patch(route('skill-sessions.completion.store', $session))
+                ->assertSessionHas('info', 'This skill swap is already completed.');
+        }
 
         $this->assertSame(2, $sender->fresh()->skill_credits);
-        $this->assertSame(2, $recipient->fresh()->skill_credits);
+        $this->assertSame(0, $recipient->fresh()->skill_credits);
+        $this->assertSame(2, $this->settlementTransactionCount($session));
+        $this->assertSame(2, (int) $sender->creditTransactions()->sum('amount'));
+        $this->assertSame(0, (int) $recipient->creditTransactions()->sum('amount'));
         $this->assertDatabaseCount('credit_transactions', 4);
+    }
+
+    #[DataProvider('inconsistentSettlementStates')]
+    public function test_inconsistent_directional_ledger_state_fails_closed(
+        bool $hasTaughtTransaction,
+        bool $hasLearnedTransaction
+    ): void {
+        [$sender, $recipient, , $session] = $this->createConfirmedSession([
+            'sender_confirmed_at' => '2026-09-09 07:30:00',
+        ]);
+        if ($hasTaughtTransaction) {
+            CreditTransaction::create([
+                'user_id' => $sender->id,
+                'skill_session_id' => $session->id,
+                'amount' => 1,
+                'reason' => CreditTransaction::REASON_SESSION_TAUGHT,
+            ]);
+        }
+        if ($hasLearnedTransaction) {
+            CreditTransaction::create([
+                'user_id' => $recipient->id,
+                'skill_session_id' => $session->id,
+                'amount' => -1,
+                'reason' => CreditTransaction::REASON_SESSION_LEARNED,
+            ]);
+        }
+        $this->travelTo('2026-09-09 08:00:00');
+
+        $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('info', 'Skill Credits could not be settled. Please try again.');
+
+        $this->assertDatabaseHas('skill_sessions', [
+            'id' => $session->id,
+            'status' => SkillSession::STATUS_CONFIRMED,
+            'sender_confirmed_at' => '2026-09-09 07:30:00',
+            'recipient_confirmed_at' => null,
+            'completed_at' => null,
+        ]);
+        $this->assertSame(1, $sender->fresh()->skill_credits);
+        $this->assertSame(1, $recipient->fresh()->skill_credits);
+        $this->assertSame((int) $hasTaughtTransaction + (int) $hasLearnedTransaction, $this->settlementTransactionCount($session));
+        $this->assertDatabaseCount('notifications', 0);
+    }
+
+    public function test_recipient_teacher_is_credited_and_sender_learner_is_debited(): void
+    {
+        [$sender, $recipient, , $session] = $this->createConfirmedSession([
+            'teaching_side' => SkillSession::TEACHING_SIDE_RECIPIENT,
+            'sender_confirmed_at' => '2026-09-09 07:30:00',
+        ]);
+        $this->travelTo('2026-09-09 08:00:00');
+
+        $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('success');
+
+        $this->assertSame(0, $sender->fresh()->skill_credits);
+        $this->assertSame(2, $recipient->fresh()->skill_credits);
+        $this->assertDatabaseHas('credit_transactions', [
+            'user_id' => $recipient->id,
+            'skill_session_id' => $session->id,
+            'amount' => 1,
+            'reason' => CreditTransaction::REASON_SESSION_TAUGHT,
+        ]);
+        $this->assertDatabaseHas('credit_transactions', [
+            'user_id' => $sender->id,
+            'skill_session_id' => $session->id,
+            'amount' => -1,
+            'reason' => CreditTransaction::REASON_SESSION_LEARNED,
+        ]);
+        $this->assertBalanceMatchesLedger($sender, $recipient);
+    }
+
+    public function test_zero_balance_blocks_second_confirmation_and_can_be_retried_after_learner_receives_credit(): void
+    {
+        [$sender, $recipient, , $session] = $this->createConfirmedSession();
+        [, , , $spendingSession] = $this->createConfirmedSession([], $sender, $recipient);
+        [, , , $earningSession] = $this->createConfirmedSession([
+            'teaching_side' => SkillSession::TEACHING_SIDE_RECIPIENT,
+        ], $sender, $recipient);
+        $this->travelTo('2026-09-09 08:00:00');
+
+        $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $spendingSession));
+        $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $spendingSession));
+        $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session));
+        $notificationCountBeforeFailure = DB::table('notifications')->count();
+
+        $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('info', 'The learner no longer has enough Skill Credits to complete this session.');
+
+        $this->assertDatabaseHas('skill_sessions', [
+            'id' => $session->id,
+            'status' => SkillSession::STATUS_CONFIRMED,
+            'recipient_confirmed_at' => null,
+            'completed_at' => null,
+        ]);
+        $this->assertSame(2, $sender->fresh()->skill_credits);
+        $this->assertSame(0, $recipient->fresh()->skill_credits);
+        $this->assertSame(0, $this->settlementTransactionCount($session));
+        $this->assertSame($notificationCountBeforeFailure, DB::table('notifications')->count());
+        $this->assertGreaterThanOrEqual(0, $recipient->fresh()->skill_credits);
+        $this->assertBalanceMatchesLedger($sender, $recipient);
+
+        $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $earningSession));
+        $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $earningSession));
+        $this->assertSame(1, $recipient->fresh()->skill_credits);
+        $this->assertBalanceMatchesLedger($sender, $recipient);
+
+        $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('success');
+        $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('info', 'This skill swap is already completed.');
+
+        $this->assertSame(SkillSession::STATUS_COMPLETED, $session->fresh()->status);
+        $this->assertNotNull($session->fresh()->recipient_confirmed_at);
+        $this->assertSame(2, $sender->fresh()->skill_credits);
+        $this->assertSame(0, $recipient->fresh()->skill_credits);
+        $this->assertSame(2, $this->settlementTransactionCount($session));
+        $this->assertBalanceMatchesLedger($sender, $recipient);
+    }
+
+    public function test_unresolved_historical_roles_block_settlement_without_persisting_second_confirmation(): void
+    {
+        [$sender, $recipient, , $session] = $this->createConfirmedSession([
+            'sender_confirmed_at' => '2026-09-09 07:30:00',
+        ]);
+        DB::table('skill_sessions')->where('id', $session->id)->update(['teaching_side' => null]);
+        $this->travelTo('2026-09-09 08:00:00');
+
+        $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
+            ->assertSessionHas('info', 'This session cannot settle Skill Credits because its teacher or learner could not be determined.');
+
+        $this->assertDatabaseHas('skill_sessions', [
+            'id' => $session->id,
+            'status' => SkillSession::STATUS_CONFIRMED,
+            'sender_confirmed_at' => '2026-09-09 07:30:00',
+            'recipient_confirmed_at' => null,
+            'completed_at' => null,
+        ]);
+        $this->assertSame(1, $sender->fresh()->skill_credits);
+        $this->assertSame(1, $recipient->fresh()->skill_credits);
+        $this->assertSame(0, $this->settlementTransactionCount($session));
+        $this->assertBalanceMatchesLedger($sender, $recipient);
+        $this->actingAs($sender)->get(route('dashboard'))->assertOk();
+        $this->actingAs($sender)->get(route('profile.show'))->assertOk();
+    }
+
+    public function test_failure_during_completion_finalization_rolls_back_balances_ledger_and_second_confirmation(): void
+    {
+        [$sender, $recipient, , $session] = $this->createConfirmedSession([
+            'sender_confirmed_at' => '2026-09-09 07:30:00',
+        ]);
+        $this->travelTo('2026-09-09 08:00:00');
+        DB::statement("CREATE TRIGGER reject_session_completion BEFORE UPDATE OF status ON skill_sessions WHEN NEW.status = 'completed' BEGIN SELECT RAISE(ABORT, 'Completion unavailable'); END");
+
+        try {
+            $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
+                ->assertSessionHas('info', 'Skill Credits could not be settled. Please try again.');
+        } finally {
+            DB::statement('DROP TRIGGER reject_session_completion');
+        }
+
+        $this->assertDatabaseHas('skill_sessions', [
+            'id' => $session->id,
+            'status' => SkillSession::STATUS_CONFIRMED,
+            'sender_confirmed_at' => '2026-09-09 07:30:00',
+            'recipient_confirmed_at' => null,
+            'completed_at' => null,
+        ]);
+        $this->assertSame(1, $sender->fresh()->skill_credits);
+        $this->assertSame(1, $recipient->fresh()->skill_credits);
+        $this->assertSame(0, $this->settlementTransactionCount($session));
+        $this->assertBalanceMatchesLedger($sender, $recipient);
+        $this->assertDatabaseCount('notifications', 0);
     }
 
     public function test_future_confirmed_session_cannot_be_confirmed_complete(): void
@@ -173,11 +393,12 @@ class SkillSessionCompletionControllerTest extends TestCase
 
         $this->travelTo(Carbon::parse('2026-09-09 16:31:00', 'UTC'));
         $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session))
-            ->assertSessionHas('success', 'Skill swap completed! You each earned +1 Skill Credit.');
+            ->assertSessionHas('success', 'Skill swap completed! The teacher earned 1 Skill Credit and the learner spent 1 Skill Credit.');
         $this->assertSame(SkillSession::STATUS_COMPLETED, $session->fresh()->status);
         $this->assertSame(2, $sender->fresh()->skill_credits);
-        $this->assertSame(2, $recipient->fresh()->skill_credits);
-        $this->assertSame(2, $session->creditTransactions()->where('reason', 'session_completed')->where('amount', 1)->count());
+        $this->assertSame(0, $recipient->fresh()->skill_credits);
+        $this->assertSame(1, $session->creditTransactions()->where('reason', CreditTransaction::REASON_SESSION_TAUGHT)->where('amount', 1)->count());
+        $this->assertSame(1, $session->creditTransactions()->where('reason', CreditTransaction::REASON_SESSION_LEARNED)->where('amount', -1)->count());
         $this->assertDatabaseCount('credit_transactions', 4);
     }
 
@@ -262,6 +483,23 @@ class SkillSessionCompletionControllerTest extends TestCase
         ];
     }
 
+    public static function settlementReasons(): array
+    {
+        return [
+            'session taught' => [CreditTransaction::REASON_SESSION_TAUGHT, 1],
+            'session learned' => [CreditTransaction::REASON_SESSION_LEARNED, -1],
+        ];
+    }
+
+    public static function inconsistentSettlementStates(): array
+    {
+        return [
+            'teaching entry only' => [true, false],
+            'learning entry only' => [false, true],
+            'both entries on an incomplete session' => [true, true],
+        ];
+    }
+
     public function test_proposed_and_cancelled_sessions_cannot_be_confirmed_complete(): void
     {
         foreach ([SkillSession::STATUS_PROPOSED, SkillSession::STATUS_CANCELLED] as $status) {
@@ -271,7 +509,7 @@ class SkillSessionCompletionControllerTest extends TestCase
                 ->assertSessionHas('info', 'Only a confirmed session can be completed.');
         }
 
-        $this->assertSame(0, CreditTransaction::where('reason', CreditTransaction::REASON_SESSION_COMPLETED)->count());
+        $this->assertSame(0, $this->settlementTransactionCount());
     }
 
     public function test_guest_unrelated_admin_and_incomplete_participant_cannot_confirm_completion(): void
@@ -287,17 +525,18 @@ class SkillSessionCompletionControllerTest extends TestCase
         $sender->update(['onboarding_completed' => false]);
         $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session))
             ->assertRedirect(route('onboarding.welcome'));
-        $this->assertSame(0, CreditTransaction::where('reason', CreditTransaction::REASON_SESSION_COMPLETED)->count());
+        $this->assertSame(0, $this->settlementTransactionCount());
     }
 
-    public function test_database_uniqueness_prevents_duplicate_session_reward(): void
+    #[DataProvider('settlementReasons')]
+    public function test_database_uniqueness_prevents_duplicate_directional_settlement(string $reason, int $amount): void
     {
         [$sender, , , $session] = $this->createConfirmedSession();
         CreditTransaction::create([
             'user_id' => $sender->id,
             'skill_session_id' => $session->id,
-            'amount' => 1,
-            'reason' => CreditTransaction::REASON_SESSION_COMPLETED,
+            'amount' => $amount,
+            'reason' => $reason,
         ]);
 
         $this->expectException(QueryException::class);
@@ -305,27 +544,32 @@ class SkillSessionCompletionControllerTest extends TestCase
         CreditTransaction::create([
             'user_id' => $sender->id,
             'skill_session_id' => $session->id,
-            'amount' => 1,
-            'reason' => CreditTransaction::REASON_SESSION_COMPLETED,
+            'amount' => $amount,
+            'reason' => $reason,
         ]);
     }
 
-    public function test_two_independent_completed_sessions_award_credits_independently(): void
+    public function test_multiple_completed_sessions_preserve_balance_and_ledger_consistency(): void
     {
         $sender = User::factory()->onboarded()->create(['name' => 'Jiro']);
         $recipient = User::factory()->onboarded()->create(['name' => 'Justine']);
+        [, , , $earningSession] = $this->createConfirmedSession([
+            'teaching_side' => SkillSession::TEACHING_SIDE_RECIPIENT,
+        ], $sender, $recipient);
         [, , , $firstSession] = $this->createConfirmedSession([], $sender, $recipient);
         [, , , $secondSession] = $this->createConfirmedSession([], $sender, $recipient);
         $this->travelTo('2026-09-09 08:00:00');
 
-        foreach ([$firstSession, $secondSession] as $session) {
+        foreach ([$earningSession, $firstSession, $secondSession] as $session) {
             $this->actingAs($sender)->patch(route('skill-sessions.completion.store', $session));
             $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session));
+            $this->assertSame(2, $this->settlementTransactionCount($session));
+            $this->assertBalanceMatchesLedger($sender, $recipient);
         }
 
-        $this->assertSame(3, $sender->fresh()->skill_credits);
-        $this->assertSame(3, $recipient->fresh()->skill_credits);
-        $this->assertDatabaseCount('credit_transactions', 6);
+        $this->assertSame(2, $sender->fresh()->skill_credits);
+        $this->assertSame(0, $recipient->fresh()->skill_credits);
+        $this->assertDatabaseCount('credit_transactions', 8);
     }
 
     public function test_chat_remains_active_and_accepts_messages_after_first_confirmation(): void
@@ -357,10 +601,11 @@ class SkillSessionCompletionControllerTest extends TestCase
         $this->travelTo('2026-09-09 08:00:00');
         $this->actingAs($recipient)->patch(route('skill-sessions.completion.store', $session));
 
-        $this->actingAs($sender)->get(route('swap-requests.chat', $swapRequest))
+        $response = $this->actingAs($sender)->get(route('swap-requests.chat', $swapRequest))
             ->assertSee('SKILL SWAP COMPLETED')->assertSee('Historical message')
             ->assertSee('This conversation is closed.')->assertDontSee('Send Message')
             ->assertDontSee('Propose Session')->assertDontSee('Confirm Session Completed');
+        $this->assertTrue($response->viewData('swapRequest')->skillSession->relationLoaded('swapRequest'));
         $this->actingAs($sender)->post(route('swap-requests.messages.store', $swapRequest), [
             'message' => 'Must not be stored',
         ])->assertSessionHas('info', 'This conversation is closed.');
@@ -408,8 +653,11 @@ class SkillSessionCompletionControllerTest extends TestCase
             ->assertSee('+1 Skill Credit earned')->assertSee('View Conversation')
             ->assertDontSee('No completed swaps yet.');
         $this->assertSame(2, $senderDashboard->viewData('user')->skill_credits);
+        $this->assertTrue($senderDashboard->viewData('completedSwapRequests')->first()->skillSession->relationLoaded('swapRequest'));
         $this->actingAs($recipient)->get(route('dashboard'))
-            ->assertSee('With Jiro')->assertSee('You taught: PHP')->assertSee('You learned: TypeScript');
+            ->assertSee('With Jiro')->assertSee('You taught: PHP')->assertSee('You learned: TypeScript')
+            ->assertSee('−1 Skill Credit spent')->assertDontSee('+1 Skill Credit earned');
+        $this->assertSame(0, $recipient->fresh()->skill_credits);
         $this->assertFalse($this->dashboardCollectionContains($sender, 'acceptedSwapRequests', $swapRequest->id));
         $this->assertFalse($this->dashboardCollectionContains($sender, 'upcomingSessions', $session->id));
     }
@@ -467,6 +715,31 @@ class SkillSessionCompletionControllerTest extends TestCase
     private function dashboardCollectionContains(User $user, string $key, int $modelId): bool
     {
         return $this->actingAs($user)->get(route('dashboard'))->viewData($key)->contains('id', $modelId);
+    }
+
+    private function settlementTransactionCount(?SkillSession $session = null): int
+    {
+        $query = CreditTransaction::query()->whereIn('reason', [
+            CreditTransaction::REASON_SESSION_TAUGHT,
+            CreditTransaction::REASON_SESSION_LEARNED,
+        ]);
+
+        if ($session !== null) {
+            $query->where('skill_session_id', $session->id);
+        }
+
+        return $query->count();
+    }
+
+    private function assertBalanceMatchesLedger(User ...$users): void
+    {
+        foreach ($users as $user) {
+            $this->assertSame(
+                $user->creditTransactions()->sum('amount'),
+                $user->fresh()->skill_credits,
+                'Stored Skill Credit balance must equal the ledger sum for user '.$user->id.'.'
+            );
+        }
     }
 
     /** @return array{teaching_side: string, date: string, time: string, duration_minutes: int, meeting_type: string} */

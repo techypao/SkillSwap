@@ -114,6 +114,10 @@ class UserDashboardController extends Controller
             ->take(5)
             ->get();
 
+        $completedSwapRequests->each(function (SwapRequest $completedSwapRequest): void {
+            $completedSwapRequest->skillSession?->setRelation('swapRequest', $completedSwapRequest);
+        });
+
         return view('dashboard', compact(
             'user',
             'recommendedMatches',

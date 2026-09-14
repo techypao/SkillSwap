@@ -528,7 +528,7 @@
                 </p>
 
                 <p class="muted">
-                    {{ $user->program?->abbreviation ?? $user->program?->name ?? 'Program not set' }}
+                    {{ $user->program?->abbreviation ?? $user->program_display_name ?? 'Program not set' }}
                 </p>
 
                 <p>
@@ -964,7 +964,11 @@
                         </p>
 
                         <p><strong>✓ Completed</strong></p>
-                        <p>+1 Skill Credit earned</p>
+                        @if ($completedSwapRequest->skillSession->teacher?->is($user))
+                            <p>+1 Skill Credit earned</p>
+                        @elseif ($completedSwapRequest->skillSession->learner?->is($user))
+                            <p>−1 Skill Credit spent</p>
+                        @endif
 
                         @if ($completedSwapRequest->skillSession->reviews->isNotEmpty())
 

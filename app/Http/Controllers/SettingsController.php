@@ -28,7 +28,7 @@ class SettingsController extends Controller
     public function update(UpdateProfileSettingsRequest $request): RedirectResponse
     {
         $user = $request->user();
-        $validated = $request->validatedWithSchool();
+        $validated = $request->validatedAcademicProfile();
 
         $removeProfilePicture = (bool) ($validated['remove_profile_picture'] ?? false);
 

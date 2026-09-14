@@ -651,7 +651,7 @@
                             </h3>
 
                             <p class="user-school">
-                                {{ $user->program?->abbreviation ?? $user->program?->name ?? 'Program not set' }}
+                                {{ $user->program?->abbreviation ?? $user->program_display_name ?? 'Program not set' }}
                                 ·
                                 {{ $user->year_level ? $user->year_level.($user->year_level === 1 ? 'st' : ($user->year_level === 2 ? 'nd' : ($user->year_level === 3 ? 'rd' : 'th'))).' Year' : 'Year level not set' }}
                             </p>

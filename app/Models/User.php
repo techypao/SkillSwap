@@ -23,6 +23,7 @@ use Illuminate\Notifications\Notifiable;
     'school_organization',
     'school_id',
     'program_id',
+    'program_name',
     'year_level',
     'bio',
     'onboarding_completed',
@@ -95,6 +96,14 @@ class User extends Authenticatable
     protected function schoolDisplayName(): Attribute
     {
         return Attribute::get(fn (): ?string => $this->school?->name ?? $this->school_organization);
+    }
+
+    /**
+     * Canonical program name when one is linked, else the free-text value.
+     */
+    protected function programDisplayName(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->program?->name ?? $this->program_name);
     }
 
     public function teachingSkills(): BelongsToMany

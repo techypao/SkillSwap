@@ -1,26 +1,22 @@
 {{--
     School / University picker.
 
-    Canonical pick: submits school_id (the server re-validates it and mirrors
-    the canonical name into school_organization). Manual fallback: submits
-    school_organization only, so school_id is stored as null.
+    A catalog pick submits school_id. Any other typed value submits as a custom
+    school_organization, so students are not limited to the suggestion list.
 --}}
 @php
-    $manualSchoolName = old('school_organization', $user->school_organization);
-    $schoolMode = $selectedSchool ? 'selected' : (filled($manualSchoolName) ? 'manual' : 'search');
+    $customSchoolName = $selectedSchool ? '' : old('school_organization', $user->school_organization);
 @endphp
 
 <div class="mb-6" data-school-picker data-search-url="{{ route('schools.search') }}">
-    <label for="{{ $schoolMode === 'manual' ? 'school_organization' : 'school_search' }}"
-           class="block text-sm font-semibold text-gray-700 mb-2"
-           data-school-label>
+    <label for="school_search" class="block text-sm font-semibold text-gray-700 mb-2">
         School / University
     </label>
 
     <input type="hidden" name="school_id" value="{{ $selectedSchool?->id }}" data-school-id>
 
     {{-- Selected canonical school --}}
-    <div data-school-selected @if ($schoolMode !== 'selected') hidden @endif>
+    <div data-school-selected @if (! $selectedSchool) hidden @endif>
         <div class="flex items-center justify-between gap-3 border border-gray-300 bg-gray-50 rounded-xl px-4 py-3">
             <div>
                 <p class="font-semibold text-gray-900" data-school-selected-name>{{ $selectedSchool?->name }}</p>
@@ -34,19 +30,24 @@
     </div>
 
     {{-- Search --}}
-    <div data-school-search-panel @if ($schoolMode !== 'search') hidden @endif>
+    <div data-school-search-panel @if ($selectedSchool) hidden @endif>
         <div class="relative">
             <input
                 type="text"
+                name="school_organization"
                 id="school_search"
+                value="{{ $customSchoolName }}"
                 autocomplete="off"
-                placeholder="Search your school..."
+                placeholder="Search or enter your school..."
+                maxlength="255"
                 role="combobox"
                 aria-autocomplete="list"
                 aria-expanded="false"
                 aria-controls="school_suggestions"
                 class="w-full border border-gray-300 rounded-xl px-4 py-3
                        focus:outline-none focus:ring-2 focus:ring-gray-900"
+                @disabled($selectedSchool)
+                @required(! $selectedSchool)
                 data-school-search
             >
 
@@ -60,35 +61,13 @@
             </div>
         </div>
 
-        <p class="text-sm text-gray-500 mt-2" data-school-empty hidden>No matching schools found.</p>
+        <p class="text-sm text-gray-500 mt-2" data-school-empty hidden>
+            No matching schools found. You can continue with the school name you entered.
+        </p>
     </div>
 
-    {{-- Manual fallback --}}
-    <div data-school-manual-panel @if ($schoolMode !== 'manual') hidden @endif>
-        <input
-            type="text"
-            name="school_organization"
-            id="school_organization"
-            value="{{ $schoolMode === 'manual' ? $manualSchoolName : '' }}"
-            placeholder="Enter your school name"
-            maxlength="255"
-            class="w-full border border-gray-300 rounded-xl px-4 py-3
-                   focus:outline-none focus:ring-2 focus:ring-gray-900"
-            @disabled($schoolMode !== 'manual')
-            @required($schoolMode === 'manual')
-            data-school-manual-input
-        >
-
-        <button type="button" class="text-sm font-semibold text-gray-700 underline mt-2" data-school-back-to-search>
-            Search the school list instead
-        </button>
-    </div>
-
-    <p class="text-sm text-gray-600 mt-2" data-school-manual-prompt @if ($schoolMode === 'manual') hidden @endif>
-        Can't find your school?
-        <button type="button" class="font-semibold text-gray-900 underline" data-school-manual>
-            Enter school manually
-        </button>
+    <p class="text-sm text-gray-600 mt-2" data-school-help @if ($selectedSchool) hidden @endif>
+        Choose a suggestion or keep your typed school name.
     </p>
 
     @error('school_id')
@@ -104,7 +83,6 @@
     <script>
         document.querySelectorAll('[data-school-picker]').forEach((picker) => {
             const searchUrl = picker.dataset.searchUrl;
-            const label = picker.querySelector('[data-school-label]');
             const schoolId = picker.querySelector('[data-school-id]');
             const selectedPanel = picker.querySelector('[data-school-selected]');
             const selectedName = picker.querySelector('[data-school-selected-name]');
@@ -114,9 +92,7 @@
             const suggestionsWrapper = picker.querySelector('[data-school-suggestions-wrapper]');
             const suggestions = picker.querySelector('[data-school-suggestions]');
             const empty = picker.querySelector('[data-school-empty]');
-            const manualPanel = picker.querySelector('[data-school-manual-panel]');
-            const manualInput = picker.querySelector('[data-school-manual-input]');
-            const manualPrompt = picker.querySelector('[data-school-manual-prompt]');
+            const help = picker.querySelector('[data-school-help]');
 
             let results = [];
             let activeIndex = -1;
@@ -136,28 +112,28 @@
                 search.setAttribute('aria-expanded', 'false');
             };
 
-            const setMode = (mode) => {
-                selectedPanel.hidden = mode !== 'selected';
-                searchPanel.hidden = mode !== 'search';
-                manualPanel.hidden = mode !== 'manual';
-                manualPrompt.hidden = mode === 'manual';
-                manualInput.disabled = mode !== 'manual';
-                manualInput.required = mode === 'manual';
-                label.htmlFor = mode === 'manual' ? 'school_organization' : 'school_search';
-
-                if (mode !== 'selected') {
-                    schoolId.value = '';
-                }
-
+            const showSearch = () => {
+                selectedPanel.hidden = true;
+                searchPanel.hidden = false;
+                help.hidden = false;
+                schoolId.value = '';
+                search.disabled = false;
+                search.required = true;
                 closeSuggestions();
+                search.focus();
             };
 
             const selectSchool = (school) => {
-                setMode('selected');
                 schoolId.value = school.id;
                 selectedName.textContent = school.name;
                 selectedLocation.textContent = locationOf(school);
+                selectedPanel.hidden = false;
+                searchPanel.hidden = true;
+                help.hidden = true;
                 search.value = '';
+                search.disabled = true;
+                search.required = false;
+                closeSuggestions();
             };
 
             const highlight = (index) => {
@@ -255,20 +231,7 @@
 
             search.addEventListener('blur', () => setTimeout(closeSuggestions, 100));
 
-            picker.querySelector('[data-school-change]').addEventListener('click', () => {
-                setMode('search');
-                search.focus();
-            });
-
-            picker.querySelector('[data-school-manual]').addEventListener('click', () => {
-                setMode('manual');
-                manualInput.focus();
-            });
-
-            picker.querySelector('[data-school-back-to-search]').addEventListener('click', () => {
-                setMode('search');
-                search.focus();
-            });
+            picker.querySelector('[data-school-change]').addEventListener('click', showSearch);
         });
     </script>
 @endonce

@@ -124,6 +124,36 @@ class AcademicProfileDisplayTest extends TestCase
             ->assertSee('Legacy Teaching');
     }
 
+    public function test_custom_program_is_shown_on_the_dashboard_and_profile(): void
+    {
+        $user = User::factory()->onboarded()->create([
+            'program_id' => null,
+            'program_name' => 'Diploma in Renewable Energy Technology',
+            'year_level' => 2,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertSee('Diploma in Renewable Energy Technology');
+
+        $this->actingAs($user)
+            ->get(route('profile.show'))
+            ->assertSee('Diploma in Renewable Energy Technology');
+    }
+
+    public function test_custom_program_name_is_escaped_when_displayed(): void
+    {
+        $user = User::factory()->onboarded()->create([
+            'program_id' => null,
+            'program_name' => '<script>alert("program")</script>',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertSee('&lt;script&gt;', false)
+            ->assertDontSee('<script>', false);
+    }
+
     public function test_custom_skill_names_are_escaped_on_discover_and_match_pages(): void
     {
         $viewer = User::factory()->onboarded()->create();
