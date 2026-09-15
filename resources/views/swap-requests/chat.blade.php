@@ -14,7 +14,7 @@
     $proposalHasErrors = $errors->hasAny($proposalFields);
     $selectedDuration = old('duration_minutes', 60);
     $selectedMeetingType = old('meeting_type', SkillSession::MEETING_TYPE_ONLINE);
-    $initialWorkspacePanel = $proposalHasErrors ? 'session' : 'chat';
+    $initialWorkspacePanel = $proposalHasErrors ? 'session' : $initialWorkspacePanel;
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -293,6 +293,7 @@
         <a href="{{ route('dashboard') }}" class="brand">SkillSwap</a>
         <div class="navbar-right">
             <span>{{ auth()->user()->name }}</span>
+            @include('partials.current-session-link')
             @include('partials.notification-bell')
             <form method="POST" action="{{ route('logout') }}">
                 @csrf

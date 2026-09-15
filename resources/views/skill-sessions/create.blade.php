@@ -205,6 +205,8 @@
 
             <span>{{ auth()->user()->name }}</span>
 
+            @include('partials.current-session-link')
+
             @include('partials.notification-bell')
 
             <form

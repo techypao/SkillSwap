@@ -30,6 +30,16 @@ class SwapChatControllerTest extends TestCase
             ->assertSeeInOrder(['You teach:', 'PHP', 'You learn:', 'TypeScript']);
     }
 
+    public function test_panel_query_opens_an_available_workspace_panel(): void
+    {
+        [$sender, , $swapRequest] = $this->createSwapRequest();
+        $this->createConfirmedSession($swapRequest, now()->copy()->subMinutes(20), 60);
+
+        $this->actingAs($sender)
+            ->get(route('swap-requests.chat', ['swapRequest' => $swapRequest, 'panel' => 'call']))
+            ->assertSee('data-active-panel="call"', false);
+    }
+
     public function test_header_shows_other_participants_program_and_year(): void
     {
         [$sender, $recipient, $swapRequest] = $this->createSwapRequest();

@@ -69,6 +69,11 @@ class SwapChatController extends Controller
         $canCall = $request->user()->can('call', $swapRequest);
         $isCallOfferer = $currentUserIsSender;
         $latestCallSignalId = $canCall ? (int) $swapRequest->callSignals()->max('id') : 0;
+        $requestedWorkspacePanel = $request->string('panel')->toString();
+        $initialWorkspacePanel = in_array($requestedWorkspacePanel, ['swaps', 'call', 'chat', 'session'], true)
+            && ($requestedWorkspacePanel !== 'call' || $canCall)
+                ? $requestedWorkspacePanel
+                : 'chat';
 
         return view('swap-requests.chat', compact(
             'swapRequest',
@@ -85,7 +90,8 @@ class SwapChatController extends Controller
             'swapSidebar',
             'canCall',
             'isCallOfferer',
-            'latestCallSignalId'
+            'latestCallSignalId',
+            'initialWorkspacePanel'
         ));
     }
 

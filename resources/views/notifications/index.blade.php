@@ -43,6 +43,7 @@
         <div class="navbar-right">
             <a href="{{ route('dashboard') }}">Dashboard</a>
             <a href="{{ route('discover.index') }}">Discover</a>
+            @include('partials.current-session-link')
             @include('partials.notification-bell')
             <form method="POST" action="{{ route('logout') }}">
                 @csrf

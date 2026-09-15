@@ -34,6 +34,7 @@
     <nav class="navbar">
         <a href="{{ route('dashboard') }}" class="brand">SkillSwap</a>
         <div style="display: flex; align-items: center; gap: 12px;">
+            @include('partials.current-session-link')
             @include('partials.notification-bell')
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
