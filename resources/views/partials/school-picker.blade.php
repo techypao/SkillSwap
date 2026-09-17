@@ -6,10 +6,11 @@
 --}}
 @php
     $customSchoolName = $selectedSchool ? '' : old('school_organization', $user->school_organization);
+    $isDark = ($theme ?? null) === 'dark';
 @endphp
 
-<div class="mb-6" data-school-picker data-search-url="{{ route('schools.search') }}">
-    <label for="school_search" class="block text-sm font-semibold text-gray-700 mb-2">
+<div class="mb-7" data-school-picker data-theme="{{ $isDark ? 'dark' : 'light' }}" data-search-url="{{ route('schools.search') }}">
+    <label for="school_search" class="mb-2 block text-sm font-medium {{ $isDark ? 'text-slate-200' : 'text-gray-700' }}">
         School / University
     </label>
 
@@ -17,13 +18,13 @@
 
     {{-- Selected canonical school --}}
     <div data-school-selected @if (! $selectedSchool) hidden @endif>
-        <div class="flex items-center justify-between gap-3 border border-gray-300 bg-gray-50 rounded-xl px-4 py-3">
+        <div class="flex items-center justify-between gap-3 rounded-xl border px-4 py-3 {{ $isDark ? 'border-violet-400/20 bg-violet-400/8' : 'border-gray-300 bg-gray-50' }}">
             <div>
-                <p class="font-semibold text-gray-900" data-school-selected-name>{{ $selectedSchool?->name }}</p>
-                <p class="text-xs text-gray-600" data-school-selected-location>{{ $selectedSchool?->location }}</p>
+                <p class="font-semibold {{ $isDark ? 'text-slate-100' : 'text-gray-900' }}" data-school-selected-name>{{ $selectedSchool?->name }}</p>
+                <p class="text-xs {{ $isDark ? 'text-slate-500' : 'text-gray-600' }}" data-school-selected-location>{{ $selectedSchool?->location }}</p>
             </div>
 
-            <button type="button" class="shrink-0 text-sm font-semibold text-gray-700 underline" data-school-change>
+            <button type="button" class="shrink-0 text-sm font-semibold {{ $isDark ? 'text-violet-300 hover:text-violet-200' : 'text-gray-700 underline' }}" data-school-change>
                 Change
             </button>
         </div>
@@ -44,8 +45,7 @@
                 aria-autocomplete="list"
                 aria-expanded="false"
                 aria-controls="school_suggestions"
-                class="w-full border border-gray-300 rounded-xl px-4 py-3
-                       focus:outline-none focus:ring-2 focus:ring-gray-900"
+                class="w-full rounded-xl border px-4 py-3 text-sm outline-none transition {{ $isDark ? 'border-white/10 bg-[#0b1120]/80 text-white placeholder:text-slate-600 hover:border-white/20 focus:border-violet-400/60 focus:ring-4 focus:ring-violet-500/10' : 'border-gray-300 focus:ring-2 focus:ring-gray-900' }}"
                 @disabled($selectedSchool)
                 @required(! $selectedSchool)
                 data-school-search
@@ -55,27 +55,27 @@
                 <ul
                     id="school_suggestions"
                     role="listbox"
-                    class="absolute z-10 mt-1 w-full max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg"
+                    class="absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border shadow-2xl {{ $isDark ? 'border-white/10 bg-[#11182d] shadow-black/40' : 'border-gray-200 bg-white shadow-lg' }}"
                     data-school-suggestions
                 ></ul>
             </div>
         </div>
 
-        <p class="text-sm text-gray-500 mt-2" data-school-empty hidden>
+        <p class="mt-2 text-sm {{ $isDark ? 'text-slate-500' : 'text-gray-500' }}" data-school-empty hidden>
             No matching schools found. You can continue with the school name you entered.
         </p>
     </div>
 
-    <p class="text-sm text-gray-600 mt-2" data-school-help @if ($selectedSchool) hidden @endif>
+    <p class="mt-2 text-sm {{ $isDark ? 'text-slate-500' : 'text-gray-600' }}" data-school-help @if ($selectedSchool) hidden @endif>
         Choose a suggestion or keep your typed school name.
     </p>
 
     @error('school_id')
-        <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+        <p class="mt-2 text-sm {{ $isDark ? 'text-rose-300' : 'text-red-500' }}">{{ $message }}</p>
     @enderror
 
     @error('school_organization')
-        <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+        <p class="mt-2 text-sm {{ $isDark ? 'text-rose-300' : 'text-red-500' }}">{{ $message }}</p>
     @enderror
 </div>
 
@@ -93,6 +93,7 @@
             const suggestions = picker.querySelector('[data-school-suggestions]');
             const empty = picker.querySelector('[data-school-empty]');
             const help = picker.querySelector('[data-school-help]');
+            const isDark = picker.dataset.theme === 'dark';
 
             let results = [];
             let activeIndex = -1;
@@ -142,7 +143,7 @@
                 suggestions.querySelectorAll('[role="option"]').forEach((option, optionIndex) => {
                     const isActive = optionIndex === index;
                     option.setAttribute('aria-selected', isActive ? 'true' : 'false');
-                    option.classList.toggle('bg-gray-100', isActive);
+                    option.classList.toggle(isDark ? 'bg-violet-400/10' : 'bg-gray-100', isActive);
 
                     if (isActive) {
                         option.scrollIntoView({ block: 'nearest' });
@@ -165,14 +166,20 @@
                     option.id = `school_option_${school.id}`;
                     option.setAttribute('role', 'option');
                     option.setAttribute('aria-selected', 'false');
-                    option.className = 'cursor-pointer px-4 py-2 hover:bg-gray-100';
+                    option.className = isDark
+                        ? 'cursor-pointer px-4 py-2.5 hover:bg-violet-400/10'
+                        : 'cursor-pointer px-4 py-2 hover:bg-gray-100';
 
                     const name = document.createElement('span');
-                    name.className = 'block font-medium text-gray-900';
+                    name.className = isDark
+                        ? 'block font-medium text-slate-100'
+                        : 'block font-medium text-gray-900';
                     name.textContent = school.name;
 
                     const location = document.createElement('span');
-                    location.className = 'block text-xs text-gray-600';
+                    location.className = isDark
+                        ? 'block text-xs text-slate-500'
+                        : 'block text-xs text-gray-600';
                     location.textContent = locationOf(school);
 
                     option.append(name, location);

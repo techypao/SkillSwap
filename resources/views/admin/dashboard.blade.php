@@ -14,7 +14,8 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="min-h-screen bg-gray-100">
+<body class="app-theme min-h-screen antialiased">
+    @include('partials.app-navbar')
 
     <div class="max-w-6xl mx-auto px-6 py-10">
 

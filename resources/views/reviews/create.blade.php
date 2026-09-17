@@ -28,20 +28,11 @@
         .alert-error { background: #fef2f2; border-radius: 10px; color: #b91c1c; margin-bottom: 18px; padding: 14px 16px; }
         @media (max-width: 600px) { .navbar { padding: 15px 18px; } }
     </style>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body>
-    <nav class="navbar">
-        <a href="{{ route('dashboard') }}" class="brand">SkillSwap</a>
-        <div style="display: flex; align-items: center; gap: 12px;">
-            @include('partials.current-session-link')
-            @include('partials.notification-bell')
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit" class="logout-button">Logout</button>
-            </form>
-        </div>
-    </nav>
+<body class="app-theme">
+    @include('partials.app-navbar')
 
     <main class="container">
         <a href="{{ route('swap-requests.chat', $skillSession->swap_request_id) }}" class="back-link">← Back to Conversation</a>

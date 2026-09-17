@@ -13,10 +13,11 @@
         'name' => $program->name,
         'abbreviation' => $program->abbreviation,
     ])->values();
+    $isDark = ($theme ?? null) === 'dark';
 @endphp
 
-<div class="mb-6" data-program-picker>
-    <label for="program_search" class="block text-sm font-semibold text-gray-700 mb-2">
+<div class="mb-7" data-program-picker data-theme="{{ $isDark ? 'dark' : 'light' }}">
+    <label for="program_search" class="mb-2 block text-sm font-medium {{ $isDark ? 'text-slate-200' : 'text-gray-700' }}">
         Program
     </label>
 
@@ -26,13 +27,13 @@
 
     {{-- Selected program --}}
     <div data-program-selected @if (! $selectedProgram) hidden @endif>
-        <div class="flex items-center justify-between gap-3 border border-gray-300 bg-gray-50 rounded-xl px-4 py-3">
+        <div class="flex items-center justify-between gap-3 rounded-xl border px-4 py-3 {{ $isDark ? 'border-violet-400/20 bg-violet-400/8' : 'border-gray-300 bg-gray-50' }}">
             <div>
-                <p class="font-semibold text-gray-900" data-program-selected-name>{{ $selectedProgram?->name }}</p>
-                <p class="text-xs text-gray-600" data-program-selected-abbreviation>{{ $selectedProgram?->abbreviation }}</p>
+                <p class="font-semibold {{ $isDark ? 'text-slate-100' : 'text-gray-900' }}" data-program-selected-name>{{ $selectedProgram?->name }}</p>
+                <p class="text-xs {{ $isDark ? 'text-slate-500' : 'text-gray-600' }}" data-program-selected-abbreviation>{{ $selectedProgram?->abbreviation }}</p>
             </div>
 
-            <button type="button" class="shrink-0 text-sm font-semibold text-gray-700 underline" data-program-change>
+            <button type="button" class="shrink-0 text-sm font-semibold {{ $isDark ? 'text-violet-300 hover:text-violet-200' : 'text-gray-700 underline' }}" data-program-change>
                 Change
             </button>
         </div>
@@ -53,8 +54,7 @@
                 aria-autocomplete="list"
                 aria-expanded="false"
                 aria-controls="program_suggestions"
-                class="w-full border border-gray-300 rounded-xl px-4 py-3
-                       focus:outline-none focus:ring-2 focus:ring-gray-900"
+                class="w-full rounded-xl border px-4 py-3 text-sm outline-none transition {{ $isDark ? 'border-white/10 bg-[#0b1120]/80 text-white placeholder:text-slate-600 hover:border-white/20 focus:border-violet-400/60 focus:ring-4 focus:ring-violet-500/10' : 'border-gray-300 focus:ring-2 focus:ring-gray-900' }}"
                 @disabled($selectedProgram)
                 @required(! $selectedProgram)
                 data-program-search
@@ -64,27 +64,27 @@
                 <ul
                     id="program_suggestions"
                     role="listbox"
-                    class="absolute z-10 mt-1 w-full max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg"
+                    class="absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border shadow-2xl {{ $isDark ? 'border-white/10 bg-[#11182d] shadow-black/40' : 'border-gray-200 bg-white shadow-lg' }}"
                     data-program-suggestions
                 ></ul>
             </div>
         </div>
 
-        <p class="text-sm text-gray-500 mt-2" data-program-empty hidden>
+        <p class="mt-2 text-sm {{ $isDark ? 'text-slate-500' : 'text-gray-500' }}" data-program-empty hidden>
             No matching programs found. You can continue with the program name you entered.
         </p>
     </div>
 
-    <p class="text-sm text-gray-600 mt-2" data-program-help @if ($selectedProgram) hidden @endif>
+    <p class="mt-2 text-sm {{ $isDark ? 'text-slate-500' : 'text-gray-600' }}" data-program-help @if ($selectedProgram) hidden @endif>
         Choose a suggestion or keep your typed program name.
     </p>
 
     @error('program_id')
-        <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+        <p class="mt-2 text-sm {{ $isDark ? 'text-rose-300' : 'text-red-500' }}">{{ $message }}</p>
     @enderror
 
     @error('program_name')
-        <p class="text-red-500 text-sm mt-2">{{ $message }}</p>
+        <p class="mt-2 text-sm {{ $isDark ? 'text-rose-300' : 'text-red-500' }}">{{ $message }}</p>
     @enderror
 </div>
 
@@ -102,6 +102,7 @@
             const suggestions = picker.querySelector('[data-program-suggestions]');
             const empty = picker.querySelector('[data-program-empty]');
             const help = picker.querySelector('[data-program-help]');
+            const isDark = picker.dataset.theme === 'dark';
 
             let results = [];
             let activeIndex = -1;
@@ -173,7 +174,7 @@
                 suggestions.querySelectorAll('[role="option"]').forEach((option, optionIndex) => {
                     const isActive = optionIndex === index;
                     option.setAttribute('aria-selected', isActive ? 'true' : 'false');
-                    option.classList.toggle('bg-gray-100', isActive);
+                    option.classList.toggle(isDark ? 'bg-violet-400/10' : 'bg-gray-100', isActive);
 
                     if (isActive) {
                         option.scrollIntoView({ block: 'nearest' });
@@ -197,16 +198,22 @@
                     const option = document.createElement('li');
                     option.setAttribute('role', 'option');
                     option.setAttribute('aria-selected', 'false');
-                    option.className = 'cursor-pointer px-4 py-2 hover:bg-gray-100';
+                    option.className = isDark
+                        ? 'cursor-pointer px-4 py-2.5 hover:bg-violet-400/10'
+                        : 'cursor-pointer px-4 py-2 hover:bg-gray-100';
 
                     const name = document.createElement('span');
-                    name.className = 'block font-medium text-gray-900';
+                    name.className = isDark
+                        ? 'block font-medium text-slate-100'
+                        : 'block font-medium text-gray-900';
                     name.textContent = program.name;
                     option.append(name);
 
                     if (program.abbreviation) {
                         const abbreviation = document.createElement('span');
-                        abbreviation.className = 'block text-xs text-gray-600';
+                        abbreviation.className = isDark
+                            ? 'block text-xs text-slate-500'
+                            : 'block text-xs text-gray-600';
                         abbreviation.textContent = program.abbreviation;
                         option.append(abbreviation);
                     }

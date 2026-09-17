@@ -35,22 +35,11 @@
         .alert-success { background: #dcfce7; border-radius: 10px; color: #166534; margin-bottom: 16px; padding: 13px 16px; }
         @media (max-width: 700px) { .navbar { padding: 15px 18px; } .navbar-right { gap: 10px; } }
     </style>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body>
-    <nav class="navbar">
-        <a href="{{ route('dashboard') }}" class="brand">SkillSwap</a>
-        <div class="navbar-right">
-            <a href="{{ route('dashboard') }}">Dashboard</a>
-            <a href="{{ route('discover.index') }}">Discover</a>
-            @include('partials.current-session-link')
-            @include('partials.notification-bell')
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit" class="logout-button">Logout</button>
-            </form>
-        </div>
-    </nav>
+<body class="app-theme">
+    @include('partials.app-navbar', ['active' => 'notifications'])
 
     <main class="container">
         <a href="{{ route('dashboard') }}" class="back-link">← Back to Dashboard</a>

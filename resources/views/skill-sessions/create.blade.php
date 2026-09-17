@@ -186,46 +186,13 @@
             }
         }
     </style>
+
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body>
+<body class="app-theme">
 
-    <nav class="navbar">
-
-        <a
-            href="{{ route('dashboard') }}"
-            class="brand"
-        >
-            SkillSwap
-        </a>
-
-        <div class="navbar-right">
-
-            <a href="{{ route('dashboard') }}">Dashboard</a>
-
-            <span>{{ auth()->user()->name }}</span>
-
-            @include('partials.current-session-link')
-
-            @include('partials.notification-bell')
-
-            <form
-                method="POST"
-                action="{{ route('logout') }}"
-            >
-                @csrf
-
-                <button
-                    type="submit"
-                    class="logout-button"
-                >
-                    Logout
-                </button>
-            </form>
-
-        </div>
-
-    </nav>
+    @include('partials.app-navbar')
 
     <main class="container">
 

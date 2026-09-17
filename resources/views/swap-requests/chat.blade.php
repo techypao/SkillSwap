@@ -286,21 +286,12 @@
             .actions, .field-row { grid-template-columns: minmax(0, 1fr); }
         }
     </style>
+
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body>
-    <nav class="navbar">
-        <a href="{{ route('dashboard') }}" class="brand">SkillSwap</a>
-        <div class="navbar-right">
-            <span>{{ auth()->user()->name }}</span>
-            @include('partials.current-session-link')
-            @include('partials.notification-bell')
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit" class="logout-button">Logout</button>
-            </form>
-        </div>
-    </nav>
+<body class="app-theme workspace-theme">
+    @include('partials.app-navbar')
 
     <nav class="workspace-tabs" role="tablist" aria-label="Workspace sections">
         @foreach (['swaps' => 'Swaps', 'call' => 'Call', 'chat' => 'Chat', 'session' => 'Session'] as $panelKey => $panelLabel)

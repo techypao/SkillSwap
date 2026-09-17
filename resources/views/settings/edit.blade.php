@@ -7,7 +7,8 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="bg-gray-100">
+<body class="app-theme min-h-screen antialiased">
+@include('partials.app-navbar', ['active' => 'settings'])
 <div class="min-h-screen px-4 py-10">
     <div class="max-w-2xl mx-auto">
 
@@ -124,10 +125,10 @@
                 </div>
 
                 {{-- School / University --}}
-                @include('partials.school-picker', ['user' => $user, 'selectedSchool' => $selectedSchool])
+                @include('partials.school-picker', ['user' => $user, 'selectedSchool' => $selectedSchool, 'theme' => 'dark'])
 
                 {{-- College Program --}}
-                @include('partials.program-picker', ['user' => $user, 'programs' => $programs])
+                @include('partials.program-picker', ['user' => $user, 'programs' => $programs, 'theme' => 'dark'])
 
                 {{-- Year Level --}}
                 <div class="mb-6">
